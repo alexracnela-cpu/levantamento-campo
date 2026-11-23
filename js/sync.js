@@ -62,6 +62,8 @@ export async function salvarRede(rede) {
     pontos: rede.pontos,
     observacoes: rede.observacoes || '',
   };
+  // só envia a metragem digitada quando ela existe no registro (coluna nova: comprimento_informado)
+  if ('comprimento_informado' in rede) registro.comprimento_informado = rede.comprimento_informado ?? null;
   await local.gravar('fila', { id: rede.id, tipo: 'rede', dados: registro, em: Date.now() });
   const k = `redes:${rede.tarefa_id}`;
   const lista = (await local.cacheLer(k)) || [];

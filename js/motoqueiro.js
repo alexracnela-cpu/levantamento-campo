@@ -12,7 +12,7 @@ import {
   finalizarTarefa,
 } from './sync.js';
 import {
-  RedeNoMapa, TIPOS, SITUACOES, CORES, svgLinha, formatarMetros,
+  RedeNoMapa, TIPOS, SITUACOES, CORES, svgLinha, formatarMetros, metragemRede, medidaInformada,
 } from './rede.js';
 import {
   $, $$, esc, aviso, dataBR, prazoVencido, novoId, dentroDoPoligono, comprimirFoto, mensagemErro, diasComPessoa,
@@ -183,7 +183,7 @@ export async function telaCampo(el, { id }, ctx) {
 
   const numeroDo = (pid) => [...simbolos.keys()].indexOf(pid) + 1;
   const atualizarResumo = () => {
-    const metros = [...redes.values()].reduce((t, r) => t + r.comprimento, 0);
+    const metros = [...redes.values()].reduce((t, r) => t + metragemRede(r.rede), 0);
     $('#campo-contagem', el).textContent = `${simbolos.size} ponto(s)${redes.size ? ` · ${formatarMetros(metros)} de rede` : ''}`;
   };
 
@@ -193,6 +193,14 @@ export async function telaCampo(el, { id }, ctx) {
       aoTocar: (alvo, ll) => {
         if (desenhando) { adicionarVertice([ll.lat, ll.lng]); return; }
         selecionarRede(alvo);
+      },
+      aoTocarVertice: (alvo, i, ll) => {
+        // desenhando: tocar num ponto antigo continua o cabo até ele; fora disso, escolhe o ponto a ajustar
+        if (desenhando && alvo === redeSel && i !== alvo.rede.pontos.length - 1) { adicionarVertice([ll.lat, ll.lng]); return; }
+        alvo.verticeAtivo = i;
+        if (alvo !== redeSel) { selecionarRede(alvo); return; }
+        alvo.desenhar();
+        renderFicha();
       },
       aoMudar: (alvo) => { salvarRede(alvo.rede); atualizarResumo(); if (redeSel === alvo) renderFicha(); },
     });
@@ -284,15 +292,38 @@ export async function telaCampo(el, { id }, ctx) {
       ? (r.pontos.length
         ? 'Toque no próximo poste ou ponto do mapa. Tocar num poste encaixa a rede no centro dele.'
         : 'Toque no poste (ou ponto do mapa) onde a rede começa.')
-      : 'Arraste os quadradinhos para ajustar o traçado.';
+      : 'Arraste os quadradinhos ou use as setas para ajustar o traçado.';
+    const informada = medidaInformada(r);
+    const doMapa = rd.comprimento;
+    const nPts = r.pontos.length;
+    const ativo = rd.indiceAtivo;
+    const passo = Number(localStorage.getItem('rondaluz-passo-cabo')) || 0.5;
     ficha.innerHTML = `
       <div class="ficha-alca"></div>
       <div class="ficha-topo">
         <div class="ficha-titulo">${svgLinha(r.tipo, r.situacao, 40)}<b>${desenhando ? 'Nova rede' : 'Rede'}</b></div>
-        <span class="medida-rede">${formatarMetros(rd.comprimento)}</span>
+        <label class="medida-rede ${informada ? 'informada' : ''}" title="Metragem do cabo (toque para digitar a medida real)">
+          <input id="r-metros" type="number" inputmode="decimal" step="0.1" min="0" max="99999"
+            value="${informada ?? Math.round(doMapa)}" aria-label="Metragem da rede em metros"> m
+        </label>
         <button class="btn primario" id="r-pronto">${desenhando ? 'Concluir' : 'Pronto'}</button>
       </div>
+      ${informada ? `<p class="ficha-dica medida-mapa">✎ Medida digitada · no mapa: ${formatarMetros(doMapa)} <button type="button" class="link" id="r-usar-mapa">usar a do mapa</button></p>` : ''}
       <p class="ficha-dica">${dica}</p>
+      ${nPts ? `<div class="ajuste-cabo">
+        <div class="ajuste-rotulo"><b>Mover ponto ${ativo + 1} de ${nPts}</b>
+          <span>${nPts > 1 ? 'Só este ponto se mexe. Toque num quadradinho para trocar.' : 'Só este ponto se mexe.'}</span>
+          <div class="passos" role="group" aria-label="Passo">
+            ${[0.5, 1, 5].map((v) => `<button type="button" data-passo="${v}" aria-pressed="${passo === v}">${String(v).replace('.', ',')} m</button>`).join('')}
+          </div>
+        </div>
+        <div class="setas" role="group" aria-label="Mover ponto">
+          <button type="button" data-mover="0,1" aria-label="Mover para o norte">▲</button>
+          <button type="button" data-mover="-1,0" aria-label="Mover para o oeste">◀</button>
+          <button type="button" data-mover="1,0" aria-label="Mover para o leste">▶</button>
+          <button type="button" data-mover="0,-1" aria-label="Mover para o sul">▼</button>
+        </div>
+      </div>` : ''}
       <div class="seg" role="group" aria-label="Tipo de rede">
         ${Object.entries(TIPOS).map(([v, t]) => `<button type="button" data-tipo="${v}" aria-pressed="${r.tipo === v}">${svgLinha(v, r.situacao, 28)} ${t}</button>`).join('')}
       </div>
@@ -305,6 +336,28 @@ export async function telaCampo(el, { id }, ctx) {
     : '<button class="btn" id="r-continuar">+ Continuar desenhando</button><button class="btn perigo" id="r-excluir">Excluir rede</button>'}
       </div>`;
     const salvarSeValida = () => { if (rd.rede.pontos.length >= 2) salvarRede(rd.rede); atualizarResumo(); };
+    $('#r-metros', ficha).onchange = (e) => {
+      const v = Number(String(e.target.value).replace(',', '.'));
+      // vazio, zero ou igual ao do mapa = volta a valer a medida do mapa
+      const manual = Number.isFinite(v) && v > 0 && Math.abs(v - Math.round(rd.comprimento)) >= 0.05 ? Math.round(v * 10) / 10 : null;
+      rd.atualizar({ comprimento_informado: manual });
+      salvarSeValida();
+      renderFicha();
+    };
+    $('#r-metros', ficha).onfocus = (e) => e.target.select();
+    const usarMapa = $('#r-usar-mapa', ficha);
+    if (usarMapa) usarMapa.onclick = () => { rd.atualizar({ comprimento_informado: null }); salvarSeValida(); renderFicha(); };
+    $$('[data-passo]', ficha).forEach((b) => {
+      b.onclick = () => { localStorage.setItem('rondaluz-passo-cabo', b.dataset.passo); renderFicha(); };
+    });
+    $$('[data-mover]', ficha).forEach((b) => {
+      b.onclick = () => {
+        const [e, n] = b.dataset.mover.split(',').map(Number);
+        rd.moverVertice(rd.indiceAtivo, e * passo, n * passo);
+        salvarSeValida();
+        renderFicha();
+      };
+    });
     $$('[data-tipo]', ficha).forEach((b) => {
       b.onclick = () => { rd.atualizar({ tipo: b.dataset.tipo }); localStorage.setItem('rondaluz-rede-tipo', b.dataset.tipo); salvarSeValida(); renderFicha(); };
     });
@@ -322,7 +375,7 @@ export async function telaCampo(el, { id }, ctx) {
     } else {
       $('#r-continuar', ficha).onclick = () => { pontosAntes = rd.rede.pontos.map((p) => [...p]); desenhando = true; selecionarRede(rd); };
       $('#r-excluir', ficha).onclick = async () => {
-        if (!await confirmar(`Excluir esta rede (${formatarMetros(rd.comprimento)})?`, 'Excluir')) return;
+        if (!await confirmar(`Excluir esta rede (${formatarMetros(metragemRede(rd.rede))})?`, 'Excluir')) return;
         apagarRede(rd);
       };
     }
@@ -448,6 +501,14 @@ export async function telaCampo(el, { id }, ctx) {
     redeSel = rd;
     if (rd) rd.selecionar(true);
     if (!rd) desenhando = false;
+    if (rd && !desenhando && rd.rede.pontos.length) {
+      // deixa o ponto que as setas movem visível acima da ficha
+      const ll = L.latLng(rd.rede.pontos[rd.indiceAtivo]);
+      if (mapa.getZoom() < 20) mapa.setView(ll, 20, { animate: false });
+      const y = mapa.latLngToContainerPoint(ll).y;
+      const alvo = mapa.getSize().y * 0.25;
+      if (Math.abs(y - alvo) > 20) mapa.panBy([0, y - alvo], { animate: true });
+    }
     mapa.getContainer().classList.toggle('desenhando', desenhando && !!rd);
     el.querySelector('.tela-campo').classList.toggle('com-ficha', !!(rd || selecionado));
     renderFicha();
@@ -485,7 +546,7 @@ export async function telaCampo(el, { id }, ctx) {
       return;
     }
     salvarRede(rd.rede);
-    aviso(`Rede salva: ${formatarMetros(rd.comprimento)}.`, 'ok');
+    aviso(`Rede salva: ${formatarMetros(metragemRede(rd.rede))}.`, 'ok');
     selecionarRede(null);
     atualizarResumo();
   }
@@ -537,7 +598,7 @@ export async function telaCampo(el, { id }, ctx) {
   });
   $('#b-rede', el).onclick = () => iniciarRede();
   $('#b-terminei', el).onclick = () => {
-    const metros = [...redes.values()].reduce((t, r) => t + r.comprimento, 0);
+    const metros = [...redes.values()].reduce((t, r) => t + metragemRede(r.rede), 0);
     const semPlaqueta = [...simbolos.values()].filter((s) => !s.ponto.plaqueta).length;
     const { caixa, fechar } = abrirModal(`<h3>Terminar o levantamento?</h3>
       <p>O líder vai ser avisado de que você terminou <b>${esc(tarefa.titulo)}</b>.</p>

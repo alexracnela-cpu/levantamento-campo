@@ -5,7 +5,7 @@ import { criarMapa, desenharArea, DesenhoDeArea } from './mapa.js';
 import { SimboloNoMapa } from './simbolo.js';
 import { montarRelatorio } from './relatorio.js';
 import {
-  RedeNoMapa, TIPOS, SITUACOES, svgLinha, legendaRede, comprimentoM, formatarMetros,
+  RedeNoMapa, TIPOS, SITUACOES, svgLinha, legendaRede, metragemRede, formatarMetros,
 } from './rede.js';
 import { abrirModal, confirmar, verOficio, seloStatus } from './comum.js';
 import {
@@ -357,7 +357,7 @@ export async function telaTarefaLider(el, { id }, ctx) {
     });
     simbolos.forEach((s) => s.grupo.bringToFront());
     const somas = {};
-    redes.forEach((r) => { const k = `${r.tipo}|${r.situacao}`; somas[k] = (somas[k] || 0) + comprimentoM(r.pontos); });
+    redes.forEach((r) => { const k = `${r.tipo}|${r.situacao}`; somas[k] = (somas[k] || 0) + metragemRede(r); });
     const linhas = Object.entries(somas).map(([k, m]) => {
       const [tipo, sit] = k.split('|');
       return `<li>${svgLinha(tipo, sit)} ${TIPOS[tipo]} ${SITUACOES[sit].toLowerCase()} <b>${formatarMetros(m)}</b></li>`;

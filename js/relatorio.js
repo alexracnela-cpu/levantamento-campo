@@ -4,7 +4,7 @@
 
 import { formasDoBloco, blocoParaMapa } from './simbolo.js';
 import {
-  comprimentoM, formatarMetros, TIPOS, SITUACOES, CORES,
+  comprimentoM, metragemRede, medidaInformada, formatarMetros, TIPOS, SITUACOES, CORES,
 } from './rede.js';
 import {
   esc, dataBR, horaBR, diasComPessoa,
@@ -174,7 +174,7 @@ export async function montarRelatorio({ tarefa, equipe, pontos, fotos, urls, red
   const semPlaqueta = pontos.filter((p) => !p.plaqueta).length;
   const fora = pontos.filter((p) => p.fora_da_area).length;
   const somas = {};
-  redes.forEach((r) => { const k = `${r.tipo}|${r.situacao}`; somas[k] = (somas[k] || 0) + comprimentoM(r.pontos); });
+  redes.forEach((r) => { const k = `${r.tipo}|${r.situacao}`; somas[k] = (somas[k] || 0) + metragemRede(r); });
   const totalRede = Object.values(somas).reduce((a, b) => a + b, 0);
   const fotosDo = (pid) => fotos.filter((f) => f.ponto_id === pid && urls[f.path]);
   const nome = (p, i) => (p.plaqueta ? `Plaqueta ${esc(p.plaqueta)}` : `Ponto ${i + 1}`);
@@ -285,7 +285,7 @@ ${previa ? '<div class="marca-dagua">PRÉVIA</div>' : ''}
 
   <h2>Rede desenhada</h2>
   ${redes.length ? `<table><thead><tr><th>Trecho</th><th>Tipo</th><th>Situação</th><th>Vértices</th><th>Comprimento</th></tr></thead><tbody>
-    ${redes.map((r, i) => `<tr><td>${linhaRede(r.tipo, r.situacao)} ${i + 1}</td><td>${TIPOS[r.tipo] || r.tipo}</td><td>${SITUACOES[r.situacao] || r.situacao}</td><td>${(r.pontos || []).length}</td><td>${formatarMetros(comprimentoM(r.pontos))}</td></tr>`).join('')}
+    ${redes.map((r, i) => `<tr><td>${linhaRede(r.tipo, r.situacao)} ${i + 1}</td><td>${TIPOS[r.tipo] || r.tipo}</td><td>${SITUACOES[r.situacao] || r.situacao}</td><td>${(r.pontos || []).length}</td><td>${medidaInformada(r) ? `${formatarMetros(medidaInformada(r))} <small>(medida em campo; mapa ${formatarMetros(comprimentoM(r.pontos))})</small>` : formatarMetros(comprimentoM(r.pontos))}</td></tr>`).join('')}
     ${Object.entries(somas).map(([k, m]) => { const [t, sit] = k.split('|'); return `<tr><td colspan="4"><b>Total ${TIPOS[t].toLowerCase()} ${SITUACOES[sit].toLowerCase()}</b></td><td><b>${formatarMetros(m)}</b></td></tr>`; }).join('')}
   </tbody></table>` : '<p class="sem-fotos">Nenhuma rede desenhada.</p>'}
 

@@ -382,6 +382,7 @@ create table if not exists public.redes (
   tipo           text not null default 'secundaria' check (tipo in ('secundaria', 'primaria')),
   situacao       text not null default 'existente' check (situacao in ('existente', 'inexistente')),
   pontos         jsonb not null,
+  comprimento_informado numeric,            -- metragem digitada em campo (vazio = medida do mapa)
   observacoes    text not null default '',
   criado_por     uuid references public.perfis(id) on delete set null default auth.uid(),
   criado_em      timestamptz not null default now(),
@@ -659,3 +660,6 @@ drop trigger if exists tarefas_atribuicao on public.tarefas;
 create trigger tarefas_atribuicao
   before insert or update of motoqueiro_id on public.tarefas
   for each row execute function public.marcar_atribuicao();
+
+-- metragem digitada em campo (supabase/rede-metragem.sql)
+alter table public.redes add column if not exists comprimento_informado numeric;
