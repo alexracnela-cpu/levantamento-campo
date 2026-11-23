@@ -31,6 +31,11 @@ export const api = {
   equipe: () => sb.from('perfis').select('*').order('nome').then(ok),
   mudarPapel: (id, papel) => sb.from('perfis').update({ papel }).eq('id', id).then(ok),
 
+  // ---- convites (só líder)
+  convites: () => sb.from('convites').select('*').is('usado_em', null).order('criado_em', { ascending: false }).then(ok),
+  convidar: (email, papel) => sb.from('convites').upsert({ email: email.trim().toLowerCase(), papel, usado_em: null }, { onConflict: 'email' }).then(ok),
+  cancelarConvite: (email) => sb.from('convites').delete().eq('email', email).then(ok),
+
   // ---- tarefas
   tarefas: () => sb.from('tarefas').select('*').order('criado_em', { ascending: false }).then(ok),
   tarefa: (id) => sb.from('tarefas').select('*').eq('id', id).maybeSingle().then(ok),

@@ -132,7 +132,7 @@ export async function telaNovaTarefa(el, _p, ctx) {
   };
 
   try {
-    const equipe = await api.equipe();
+    const equipe = (await api.equipe()).filter((m) => m.papel !== 'bloqueado');
     const sel = $('select[name=motoqueiro_id]', el);
     sel.innerHTML = '<option value="">Escolha…</option>' + equipe
       .sort((a, b) => (a.papel === b.papel ? a.nome.localeCompare(b.nome) : a.papel === 'motoqueiro' ? -1 : 1))
@@ -207,7 +207,7 @@ export async function telaTarefaLider(el, { id }, ctx) {
         <label>Status<select id="status">${Object.entries(STATUS).map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select></label>
         <label>Prazo<input type="date" id="prazo"></label>
         <label class="largura-total">Motoqueiro<select id="motoqueiro"><option value="">— sem motoqueiro —</option>
-          ${equipe.map((m) => `<option value="${m.id}">${esc(m.nome || m.email)}${m.papel === 'lider' ? ' (líder)' : ''}</option>`).join('')}</select></label>
+          ${equipe.filter((m) => m.papel !== 'bloqueado' || m.id === tarefa.motoqueiro_id).map((m) => `<option value="${m.id}">${esc(m.nome || m.email)}${m.papel === 'lider' ? ' (líder)' : ''}</option>`).join('')}</select></label>
       </div>
       <div class="linha-botoes">
         <button class="btn" id="b-oficio" ${tarefa.oficio_path ? '' : 'disabled'}>📄 Ver ofício</button>
@@ -332,40 +332,89 @@ export async function telaTarefaLider(el, { id }, ctx) {
 }
 
 // ------------------------------------------------------------------
-// Equipe
+// Equipe: convites, papéis e remoção de acesso
 // ------------------------------------------------------------------
 export async function telaEquipe(el, _p, ctx) {
   el.innerHTML = `<section class="pagina">
     <div class="cabecalho-pagina"><h1>Equipe</h1></div>
-    <p class="dica">Quem cria conta entra como motoqueiro. Aqui você promove alguém a líder (ou volta a motoqueiro).</p>
+    <p class="dica">Só entra quem você convidar. A pessoa cria a conta no site usando exatamente o e-mail convidado.</p>
+    <form id="f-convite" class="cartao-convite">
+      <h3>Convidar pessoa</h3>
+      <div class="linha-convite">
+        <input name="email" type="email" required placeholder="email@exemplo.com" autocomplete="off">
+        <select name="papel"><option value="motoqueiro">Motoqueiro</option><option value="lider">Líder</option></select>
+        <button class="btn primario">Convidar</button>
+      </div>
+    </form>
+    <div id="convites"></div>
+    <h3 class="titulo-secao">Membros</h3>
     <div id="equipe" class="lista-equipe"><p class="vazio">Carregando…</p></div>
   </section>`;
 
+  const NOMES = { lider: 'Líder', motoqueiro: 'Motoqueiro', bloqueado: 'Sem acesso' };
+  const CLASSE = { lider: 'selo-lider', motoqueiro: 'selo-moto', bloqueado: 'selo-alerta' };
+
   const carregar = async () => {
     try {
-      const eq = await api.equipe();
-      $('#equipe', el).innerHTML = eq.map((m) => `
-        <div class="membro">
-          <div><b>${esc(m.nome || '—')}</b>${m.id === ctx.perfil.id ? ' <span class="voce">(você)</span>' : ''}<br><span class="email">${esc(m.email)}</span></div>
-          <span class="selo ${m.papel === 'lider' ? 'selo-lider' : 'selo-moto'}">${m.papel === 'lider' ? 'Líder' : 'Motoqueiro'}</span>
-          ${m.id === ctx.perfil.id ? '<span></span>'
-    : `<button class="btn" data-id="${m.id}" data-papel="${m.papel === 'lider' ? 'motoqueiro' : 'lider'}">
-            ${m.papel === 'lider' ? 'Tornar motoqueiro' : 'Promover a líder'}</button>`}
-        </div>`).join('');
+      const [eq, cv] = await Promise.all([api.equipe(), api.convites()]);
+      $('#convites', el).innerHTML = cv.length ? `<h3 class="titulo-secao">Convites aguardando cadastro</h3>
+        <div class="lista-equipe">${cv.map((c) => `<div class="membro">
+          <div><b>${esc(c.email)}</b><br><span class="email">convidado em ${horaBR(c.criado_em)}</span></div>
+          <span class="selo ${CLASSE[c.papel]}">${NOMES[c.papel]}</span>
+          <button class="btn" data-cancelar="${esc(c.email)}">Cancelar convite</button></div>`).join('')}</div>` : '';
+
+      $('#equipe', el).innerHTML = eq.map((m) => {
+        const eu = m.id === ctx.perfil.id;
+        let botoes = '';
+        if (!eu) {
+          if (m.papel === 'bloqueado') botoes = `<button class="btn" data-id="${m.id}" data-papel="motoqueiro">Devolver acesso</button>`;
+          else {
+            botoes = `<button class="btn" data-id="${m.id}" data-papel="${m.papel === 'lider' ? 'motoqueiro' : 'lider'}">
+              ${m.papel === 'lider' ? 'Tornar motoqueiro' : 'Promover a líder'}</button>
+              <button class="btn perigo" data-id="${m.id}" data-papel="bloqueado" data-nome="${esc(m.nome || m.email)}">Remover acesso</button>`;
+          }
+        }
+        return `<div class="membro ${m.papel === 'bloqueado' ? 'apagado' : ''}">
+          <div><b>${esc(m.nome || '—')}</b>${eu ? ' <span class="voce">(você)</span>' : ''}<br><span class="email">${esc(m.email)}</span></div>
+          <span class="selo ${CLASSE[m.papel]}">${NOMES[m.papel]}</span>
+          <div class="botoes-membro">${botoes}</div>
+        </div>`;
+      }).join('');
+
       $$('button[data-id]', el).forEach((b) => {
         b.onclick = async () => {
+          if (b.dataset.papel === 'bloqueado'
+            && !await confirmar(`Remover o acesso de ${b.dataset.nome}? A pessoa não consegue mais ver nem enviar nada.`, 'Remover acesso')) return;
           b.disabled = true;
           try {
             await api.mudarPapel(b.dataset.id, b.dataset.papel);
-            aviso('Papel atualizado.', 'ok');
+            aviso('Equipe atualizada.', 'ok');
             carregar();
           } catch (e) { aviso(mensagemErro(e), 'erro'); b.disabled = false; }
+        };
+      });
+      $$('button[data-cancelar]', el).forEach((b) => {
+        b.onclick = async () => {
+          try { await api.cancelarConvite(b.dataset.cancelar); aviso('Convite cancelado.', 'ok'); carregar(); } catch (e) { aviso(mensagemErro(e), 'erro'); }
         };
       });
     } catch (e) {
       $('#equipe', el).innerHTML = `<p class="vazio">${esc(mensagemErro(e))}</p>`;
     }
   };
+
+  $('#f-convite', el).onsubmit = async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const email = String(f.get('email')).trim().toLowerCase();
+    try {
+      await api.convidar(email, f.get('papel'));
+      e.target.reset();
+      aviso(`Convite registrado. Avise ${email} para criar a conta em ${location.host}.`, 'ok');
+      carregar();
+    } catch (err) { aviso(mensagemErro(err), 'erro'); }
+  };
+
   await carregar();
   return null;
 }

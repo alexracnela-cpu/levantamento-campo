@@ -310,3 +310,15 @@ body.modo-campo .aviso.mostrar { transform: translate(-50%, 0); }
 .chip-sinc.ok { color: var(--verde); }
 .chip-sinc.pendente { background: #fef3c7; color: #92400e; }
 .chip-sinc.offline { background: #fee2e2; color: var(--vermelho); }
+
+/* convites */
+.cartao-convite { background: #fffdf8; border: 1.5px solid var(--linha); border-left: 5px solid var(--vermelho); border-radius: var(--raio); padding: 14px 16px; margin: 10px 0 6px; }
+.cartao-convite h3 { margin-top: 0; }
+.linha-convite { display: grid; grid-template-columns: 1fr 160px auto; gap: 8px; }
+.botoes-membro { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.membro.apagado { opacity: .6; }
+@media (max-width: 600px) {
+  .linha-convite { grid-template-columns: 1fr; }
+  .membro { grid-template-columns: 1fr auto; }
+  .botoes-membro { grid-column: 1 / -1; justify-content: flex-start; }
+}

@@ -119,7 +119,7 @@ function telaAcesso(modo = 'entrar') {
         <label>E-mail<input name="email" type="email" required autocomplete="email"></label>
         <label>Senha<input name="senha" type="password" required minlength="6" autocomplete="${modo === 'criar' ? 'new-password' : 'current-password'}"></label>
         <button class="btn primario largo">${modo === 'criar' ? 'Criar conta' : 'Entrar'}</button>
-        ${modo === 'criar' ? '<p class="dica">A primeira conta criada vira líder. As outras entram como motoqueiro.</p>' : ''}
+        ${modo === 'criar' ? '<p class="dica">Só é possível criar conta com o e-mail que o líder convidou.</p>' : ''}
       </form>
     </div>
   </section>`;
@@ -182,6 +182,15 @@ async function entrouCom(sessao) {
       <code>supabase/schema.sql</code> foi executado no Supabase antes de criar as contas.</p>
       <button class="btn" id="b-sair2">Sair</button></section>`;
     $('#b-sair2', tela).onclick = sair;
+    return;
+  }
+  if (perfil.papel === 'bloqueado') {
+    topo.hidden = true;
+    tela.innerHTML = `<section class="acesso"><div class="acesso-caixa">
+      <div class="acesso-marca"><img src="icones/icone-192.png" alt="" width="88" height="88"><h1 class="nome-marca">Ronda<b>Luz</b></h1></div>
+      <h2>Acesso removido</h2><p>Seu acesso ao RondaLuz foi removido por um líder. Fale com ele se achar que é engano.</p>
+      <button class="btn largo" id="b-sair2">Sair</button></div></section>`;
+    $('#b-sair2', tela).onclick = () => api.sair();
     return;
   }
   ctx = { perfil, usuario, navegar, recarregar: rotear };
