@@ -548,3 +548,14 @@ body.modo-campo .aviso.mostrar { transform: translate(-50%, 0); }
 .botao-tema:hover { background: rgba(255, 255, 255, .22); }
 .acesso-caixa { position: relative; }
 .acesso-caixa .botao-tema { position: absolute; top: 10px; right: 10px; background: var(--papel-2); color: var(--tinta); }
+
+/* poste (altura/esforço) na ficha */
+.ficha-poste { margin-top: 12px; }
+.ficha-poste > label { display: block; margin-bottom: 5px; }
+.ficha-poste small { font-weight: 400; color: var(--suave); margin-left: 4px; }
+.poste-linha { display: grid; grid-template-columns: 1fr 52px; }
+.poste-linha input { border-radius: var(--raio) 0 0 var(--raio); font: 700 1.15rem var(--corpo); letter-spacing: .5px; }
+.poste-linha button { border: 1.5px solid var(--tinta); border-radius: 0 var(--raio) var(--raio) 0; background: var(--tinta-clara); color: var(--tinta); font: 700 1.5rem var(--corpo); cursor: pointer; }
+.poste-atalhos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.poste-atalhos button { border: 1px solid var(--linha); background: var(--superficie); color: var(--tinta); border-radius: 16px; padding: 5px 11px; font: 600 .85rem var(--corpo); cursor: pointer; }
+.poste-atalhos button[aria-pressed=true] { background: var(--marinho); border-color: var(--marinho); color: #fff; }

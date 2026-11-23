@@ -276,8 +276,8 @@ ${previa ? '<div class="marca-dagua">PRÉVIA</div>' : ''}
   </div>
 
   <h2>Pontos levantados</h2>
-  ${pontos.length ? `<table><thead><tr><th>Nº</th><th>Plaqueta</th><th>Coordenadas (lat, long)</th><th>Tamanho / rumo</th><th>Fotos</th><th>Observações</th></tr></thead><tbody>
-    ${pontos.map((p, i) => `<tr><td><b>${i + 1}</b></td><td>${p.plaqueta ? esc(p.plaqueta) : '<span class="fora">sem plaqueta</span>'}</td>
+  ${pontos.length ? `<table><thead><tr><th>Nº</th><th>Plaqueta</th><th>Poste</th><th>Coordenadas (lat, long)</th><th>Tamanho / rumo</th><th>Fotos</th><th>Observações</th></tr></thead><tbody>
+    ${pontos.map((p, i) => `<tr><td><b>${i + 1}</b></td><td>${p.plaqueta ? esc(p.plaqueta) : '<span class="fora">sem plaqueta</span>'}</td><td>${esc(p.poste || '—')}</td>
       <td>${coord(p)}${p.fora_da_area ? '<br><span class="fora">fora da área</span>' : ''}</td>
       <td>${String(p.tamanho_m).replace('.', ',')} m · ${Math.round(p.rotacao)}°</td><td>${fotosDo(p.id).length}</td>
       <td>${esc(p.observacoes || '—')}</td></tr>`).join('')}
@@ -294,7 +294,7 @@ ${previa ? '<div class="marca-dagua">PRÉVIA</div>' : ''}
     const fs = fotosDo(p.id);
     return `<div class="ficha ${fs.length > 2 ? 'longa' : ''}">
       <div class="ficha-cab"><i class="num">${i + 1}</i><h3>${nome(p, i)}</h3>${p.fora_da_area ? '<span class="selo previa">fora da área</span>' : ''}</div>
-      <div class="dados">Coordenadas: <b>${coord(p)}</b> · Tamanho: <b>${String(p.tamanho_m).replace('.', ',')} m</b> · Rumo: <b>${Math.round(p.rotacao)}°</b> · Registrado em ${horaBR(p.criado_em)}</div>
+      <div class="dados">${p.poste ? `Poste: <b>${esc(p.poste)}</b> · ` : ''}Coordenadas: <b>${coord(p)}</b> · Tamanho: <b>${String(p.tamanho_m).replace('.', ',')} m</b> · Rumo: <b>${Math.round(p.rotacao)}°</b> · Registrado em ${horaBR(p.criado_em)}</div>
       ${p.observacoes ? `<div class="obs">${esc(p.observacoes)}</div>` : '<div class="dados">Sem observações.</div>'}
       ${fs.length ? `<div class="fotos">${fs.map((f, k) => `<figure><img src="${urls[f.path]}" alt="Foto ${k + 1}"><figcaption>Foto ${k + 1} · ${horaBR(f.criado_em)}</figcaption></figure>`).join('')}</div>` : '<p class="sem-fotos">Sem fotos.</p>'}
     </div>`;

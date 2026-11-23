@@ -663,3 +663,6 @@ create trigger tarefas_atribuicao
 
 -- metragem digitada em campo (supabase/rede-metragem.sql)
 alter table public.redes add column if not exists comprimento_informado numeric;
+
+-- Poste altura/esforço (também em poste.sql)
+alter table public.pontos add column if not exists poste text not null default '';

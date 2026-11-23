@@ -406,6 +406,14 @@ export async function telaCampo(el, { id }, ctx) {
           <input id="f-rumo" type="number" inputmode="numeric" step="1" value="${Math.round(p.rotacao)}">
           <button type="button" data-r="15">⟳</button></div></label>
       </div>
+      <div class="ficha-poste">
+        <label for="f-poste">Poste <small>altura/esforço · ex.: 11/300</small></label>
+        <div class="poste-linha">
+          <input id="f-poste" type="text" inputmode="decimal" maxlength="20" autocomplete="off" placeholder="11/300" value="${esc(p.poste || '')}">
+          <button type="button" id="f-barra" aria-label="Inserir barra">/</button>
+        </div>
+        <div class="poste-atalhos">${['9/150', '10/150', '11/200', '11/300', '12/300', '12/400', '13/600'].map((v) => `<button type="button" data-poste="${v}" aria-pressed="${p.poste === v}">${v}</button>`).join('')}</div>
+      </div>
       <label class="ficha-obs">Observações
         <textarea id="f-obs" rows="3" placeholder="Ex.: luminária apagada, braço torto, poste de concreto…">${esc(p.observacoes || '')}</textarea></label>
       <div class="ficha-fotos-cab">
@@ -443,6 +451,30 @@ export async function telaCampo(el, { id }, ctx) {
       e.target.value = Math.round(s.ponto.rotacao);
       gravar(s);
     };
+    const campoPoste = $('#f-poste', ficha);
+    let tPoste;
+    const marcarAtalho = () => $$('[data-poste]', ficha).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.poste === campoPoste.value.trim())));
+    const guardarPoste = (imediato) => {
+      s.ponto.poste = campoPoste.value.trim();
+      marcarAtalho();
+      clearTimeout(tPoste);
+      if (imediato) salvarPonto(s.ponto); else tPoste = setTimeout(() => salvarPonto(s.ponto), 800);
+    };
+    campoPoste.oninput = () => guardarPoste(false);
+    campoPoste.onblur = () => guardarPoste(true);
+    campoPoste.onkeydown = (e) => { if (e.key === 'Enter') campoPoste.blur(); };
+    const barra = $('#f-barra', ficha);
+    barra.onpointerdown = (e) => e.preventDefault(); // não tira o foco (o teclado continua aberto)
+    barra.onclick = () => {
+      const ini = campoPoste.selectionStart ?? campoPoste.value.length;
+      const fim = campoPoste.selectionEnd ?? campoPoste.value.length;
+      campoPoste.setRangeText('/', ini, fim, 'end');
+      campoPoste.focus();
+      guardarPoste(false);
+    };
+    $$('[data-poste]', ficha).forEach((b) => {
+      b.onclick = () => { campoPoste.value = b.dataset.poste; guardarPoste(true); };
+    });
     let tPlaq;
     $('#f-plaqueta', ficha).oninput = (e) => {
       s.ponto.plaqueta = e.target.value;
@@ -580,6 +612,7 @@ export async function telaCampo(el, { id }, ctx) {
       tamanho_m: limitarTamanho(localStorage.getItem('rondaluz-tamanho') || TAMANHO_PADRAO),
       rotacao: 90,
       plaqueta: '',
+      poste: '',
       observacoes: '',
       fora_da_area: false,
     };
