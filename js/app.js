@@ -7,6 +7,7 @@ import { telaPainel, telaNovaTarefa, telaTarefaLider, telaEquipe } from './lider
 import { telaMinhas, telaCampo } from './motoqueiro.js';
 import { $, esc, aviso, mensagemErro } from './util.js';
 import { iniciarAvisos, podePedirPermissao, pedirPermissao } from './avisos.js';
+import { aplicarTema, botaoTema, ligarBotoesTema } from './tema.js';
 
 const tela = document.getElementById('tela');
 const topo = document.getElementById('topo');
@@ -73,10 +74,12 @@ function montarTopo() {
     </nav>
     <button id="b-avisos" class="sinc avisos-btn" title="Receber avisos neste aparelho" hidden>🔔 Ativar avisos</button>
     <button id="sinc" class="sinc" title="Envio de dados"></button>
+    ${botaoTema()}
     <div class="usuario"><span>${esc(ctx.perfil.nome || ctx.perfil.email)}</span>
       <small>${lider ? 'Líder' : 'Motoqueiro'}</small></div>
     <button class="btn" id="b-sair">Sair</button>`;
   $('#b-sair', topo).onclick = sair;
+  ligarBotoesTema(topo);
   $('#sinc', topo).onclick = () => { sincronizar(); mostrarFila(); };
   const bAvisos = $('#b-avisos', topo);
   bAvisos.hidden = !podePedirPermissao();
@@ -128,6 +131,7 @@ function telaAcesso(modo) {
   topo.hidden = true;
   tela.innerHTML = `<section class="acesso">
     <div class="acesso-caixa">
+      ${botaoTema()}
       <div class="acesso-marca"><img src="icones/icone.svg" alt="" width="88" height="88"><h1 class="nome-marca">Ronda<b>Luz</b></h1><p>Levantamentos de iluminação pública · Manaus</p></div>
       <div class="abas abas-entrada">
         <button class="aba ${m === 'moto' ? 'ativa' : ''}" data-modo="moto">🏍 Motoqueiro</button>
@@ -139,6 +143,7 @@ function telaAcesso(modo) {
   tela.querySelectorAll('[data-modo]').forEach((b) => {
     b.onclick = () => { lembrarModo(b.dataset.modo); telaAcesso(b.dataset.modo); };
   });
+  ligarBotoesTema(tela);
   if (m === 'moto') entradaMotoqueiro($('#entrada', tela));
   else entradaLider($('#entrada', tela), m === 'criar');
 }
@@ -366,6 +371,7 @@ async function sair() {
 // Início
 // ------------------------------------------------------------------
 async function iniciar() {
+  aplicarTema();
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('Service worker:', e));
   }

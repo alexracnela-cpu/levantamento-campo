@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
+  <script>try { var t = localStorage.getItem('rondaluz-tema'); if (t === 'escuro' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) document.body.classList.add('tema-escuro'); } catch (e) {}</script>
   <header id="topo" class="topo" hidden></header>
   <main id="tela" class="tela"><section class="pagina"><p class="vazio">Carregando…</p></section></main>
   <div id="modal" class="modal"></div>
