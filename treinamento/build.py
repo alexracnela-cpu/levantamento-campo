@@ -7,7 +7,7 @@ APP = Path(__file__).resolve().parent.parent
 AQUI = Path(__file__).parent
 
 # ordem de dependência; store.js é trocado pela versão em memória
-MODULOS = ['util', 'store', 'api', 'sync', 'simbolo', 'rede', 'relatorio', 'mapa', 'comum', 'lider', 'motoqueiro', 'app']
+MODULOS = ['util', 'store', 'api', 'sync', 'simbolo', 'rede', 'relatorio', 'avisos', 'mapa', 'comum', 'lider', 'motoqueiro', 'app']
 
 CRIAR_MAPA_DEMO = '''export function criarMapa(el, { centro = MANAUS, zoom = 17 } = {}) {
   const mapa = L.map(el, { zoomControl: true, minZoom: 15, maxZoom: 22 }).setView(centro, zoom);
@@ -74,6 +74,7 @@ def main():
     icone = 'data:image/svg+xml;base64,' + base64.b64encode((APP / 'icones' / 'icone.svg').read_bytes()).decode()
     # o app usa icones/icone.svg; na página publicada vira data: URI
     script = script.replace('src="icones/icone.svg"', f'src="{icone}"').replace('src="icones/icone-192.png"', f'src="{icone}"')
+    script = script.replace("'icones/icone-192.png'", f"'{icone}'")
     assert 'icones/' not in script, 'ainda há caminho de ícone no script'
     html = (AQUI / 'shell.html').read_text()
     html = html.replace('/*LEAFLET_CSS*/', (AQUI / 'leaflet.css').read_text())

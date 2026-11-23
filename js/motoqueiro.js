@@ -15,7 +15,7 @@ import {
   RedeNoMapa, TIPOS, SITUACOES, CORES, svgLinha, formatarMetros,
 } from './rede.js';
 import {
-  $, $$, esc, aviso, dataBR, prazoVencido, novoId, dentroDoPoligono, comprimirFoto, mensagemErro,
+  $, $$, esc, aviso, dataBR, prazoVencido, novoId, dentroDoPoligono, comprimirFoto, mensagemErro, diasComPessoa,
 } from './util.js';
 
 // ------------------------------------------------------------------
@@ -38,6 +38,7 @@ export async function telaMinhas(el, _p, ctx) {
         <h3>${esc(t.titulo)}</h3>
         ${t.descricao ? `<p class="ct-desc">${esc(t.descricao)}</p>` : ''}
         <p class="ct-meta ${prazoVencido(t.prazo, t.status) ? 'vencido' : ''}">Prazo: ${dataBR(t.prazo)}${t.oficio_path ? ' · 📄 ofício' : ''}</p>
+        ${(() => { const d = diasComPessoa(t); return d ? `<p class="ct-meta">📅 Com você ${d.texto}</p>` : ''; })()}
       </a>`).join('') : '<p class="vazio">Nenhuma tarefa para você no momento.</p>');
   };
 

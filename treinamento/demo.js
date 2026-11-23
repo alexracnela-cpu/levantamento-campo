@@ -109,18 +109,18 @@ async function semear() {
         id: t1, titulo: 'Av. do Centro — trecho principal',
         descricao: 'Levantar todos os postes do trecho. Anotar luminárias apagadas e braços tortos.',
         prazo: hojeMais(3), area: retangulo(-150, -80, 150, 80), motoqueiro_id: UID.joao, status: 'em_andamento',
-        criado_por: UID.lider, criado_em: iso(300),
+        criado_por: UID.lider, criado_em: iso(60 * 24 * 3 + 30), atribuida_em: iso(60 * 24 * 3),
         oficio_path: `${t1}/oficio-0043-2026.png`, oficio_nome: 'Ofício 0043-2026.png', oficio_tipo: 'image/png',
       },
       {
         id: t2, titulo: 'Rua do Porto — praça', descricao: 'Conferir a iluminação da praça e das calçadas em volta.',
         prazo: hojeMais(8), area: retangulo(-120, 150, 120, 330), motoqueiro_id: UID.joao, status: 'pendente',
-        criado_por: UID.lider, criado_em: iso(200),
+        criado_por: UID.lider, criado_em: iso(60 * 24 + 20), atribuida_em: iso(60 * 24),
       },
       {
         id: t3, titulo: 'Rua Tarumã — quadra 4', descricao: '', prazo: hojeMais(-2),
         area: retangulo(120, -300, 320, -140), motoqueiro_id: UID.carla, status: 'concluido',
-        criado_por: UID.lider, criado_em: iso(5000),
+        criado_por: UID.lider, criado_em: iso(60 * 24 * 9), atribuida_em: iso(60 * 24 * 9), finalizada_em: iso(60 * 24 * 5),
       },
     ],
     pontos: [
@@ -241,7 +241,7 @@ function criarSb(inst) {
             const novo = {
               ...(t === 'convites' ? {} : { id: crypto.randomUUID() }),
               criado_em: agora,
-              ...(t === 'tarefas' ? { status: 'pendente', descricao: '', criado_por: inst.uid } : {}),
+              ...(t === 'tarefas' ? { status: 'pendente', descricao: '', criado_por: inst.uid, atribuida_em: v.motoqueiro_id ? agora : null } : {}),
               ...(t === 'pontos' || t === 'redes' ? { atualizado_em: agora, criado_por: inst.uid } : {}),
               ...(t === 'convites' ? { convidado_por: inst.uid, usado_em: null } : {}),
               ...v,
@@ -260,7 +260,12 @@ function criarSb(inst) {
           && !DB.dados.perfis.some((p) => p.papel === 'lider' && !alvo.includes(p))) {
           return { data: null, error: { message: 'A equipe precisa de pelo menos um líder.' } };
         }
-        alvo.forEach((r) => { Object.assign(r, this.v); notificar(t, 'UPDATE', r); });
+        alvo.forEach((r) => {
+          const trocouMoto = t === 'tarefas' && 'motoqueiro_id' in this.v && this.v.motoqueiro_id !== r.motoqueiro_id;
+          Object.assign(r, this.v);
+          if (trocouMoto) r.atribuida_em = r.motoqueiro_id ? agora : null; // igual ao gatilho do banco
+          notificar(t, 'UPDATE', r);
+        });
         return this.fim(alvo.map((r) => structuredClone(r)));
       }
       if (this.op === 'delete') {
@@ -575,6 +580,7 @@ function criarApp(raiz, inst) {
   };
   const navigator = { get onLine() { return inst.online; }, geolocation: criarGeo(inst) };
   const localStorage = memoria();
+  const Notification = undefined; // o visualizador não mostra notificações do sistema
   const sessionStorage = memoria();
 
   raiz.addEventListener('click', (e) => {

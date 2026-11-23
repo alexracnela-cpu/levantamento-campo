@@ -6,11 +6,13 @@ import { iniciarSincronizacao, aoMudarFila, sincronizar, estadoFila } from './sy
 import { telaPainel, telaNovaTarefa, telaTarefaLider, telaEquipe } from './lider.js';
 import { telaMinhas, telaCampo } from './motoqueiro.js';
 import { $, esc, aviso, mensagemErro } from './util.js';
+import { iniciarAvisos, podePedirPermissao, pedirPermissao } from './avisos.js';
 
 const tela = document.getElementById('tela');
 const topo = document.getElementById('topo');
 let ctx = { perfil: null, usuario: null };
 let limparTela = null;
+let pararAvisos = null;
 
 const ROTAS = {
   lider: [
@@ -69,12 +71,20 @@ function montarTopo() {
       ${lider ? '<a href="#/painel" data-m="painel">Levantamentos</a><a href="#/equipe" data-m="equipe">Equipe</a><a href="#/minhas" data-m="minhas">Minhas tarefas</a>'
     : '<a href="#/minhas" data-m="minhas">Minhas tarefas</a>'}
     </nav>
+    <button id="b-avisos" class="sinc avisos-btn" title="Receber avisos neste aparelho" hidden>🔔 Ativar avisos</button>
     <button id="sinc" class="sinc" title="Envio de dados"></button>
     <div class="usuario"><span>${esc(ctx.perfil.nome || ctx.perfil.email)}</span>
       <small>${lider ? 'Líder' : 'Motoqueiro'}</small></div>
     <button class="btn" id="b-sair">Sair</button>`;
   $('#b-sair', topo).onclick = sair;
   $('#sinc', topo).onclick = () => { sincronizar(); mostrarFila(); };
+  const bAvisos = $('#b-avisos', topo);
+  bAvisos.hidden = !podePedirPermissao();
+  bAvisos.onclick = async () => {
+    const r = await pedirPermissao();
+    bAvisos.hidden = true;
+    aviso(r === 'granted' ? 'Pronto! Você vai receber avisos neste aparelho.' : 'Avisos bloqueados. Dá para liberar nas configurações do navegador.', r === 'granted' ? 'ok' : 'erro');
+  };
   estadoFila().then(desenharSinc);
 }
 
@@ -338,6 +348,9 @@ async function entrouCom(sessao) {
   }
   ctx = { perfil, usuario, navegar, recarregar: rotear };
   montarTopo();
+  if (pararAvisos) pararAvisos();
+  pararAvisos = null;
+  iniciarAvisos(ctx).then((f) => { pararAvisos = f; });
   rotear();
 }
 
@@ -363,6 +376,8 @@ async function iniciar() {
 
   sb.auth.onAuthStateChange((evento, sessao) => {
     if (evento === 'SIGNED_OUT' || !sessao) {
+      if (pararAvisos) { pararAvisos(); pararAvisos = null; }
+      document.querySelectorAll('.popup-aviso').forEach((p) => p.remove());
       ctx = { perfil: null, usuario: null };
       montarTopo();
       telaAcesso();

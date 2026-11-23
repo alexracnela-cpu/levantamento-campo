@@ -9,7 +9,7 @@ import {
 } from './rede.js';
 import { abrirModal, confirmar, verOficio, seloStatus } from './comum.js';
 import {
-  $, $$, esc, aviso, dataBR, horaBR, prazoVencido, novoId, nomeArquivoSeguro, mensagemErro, STATUS,
+  $, $$, esc, aviso, dataBR, horaBR, prazoVencido, novoId, nomeArquivoSeguro, mensagemErro, STATUS, diasComPessoa,
 } from './util.js';
 
 // ------------------------------------------------------------------
@@ -70,7 +70,10 @@ export async function telaPainel(el, _p, ctx) {
       <a class="cartao-tarefa" href="#/tarefa/${t.id}">
         <div class="ct-topo">${seloStatus(t.status)}${t.finalizada_em && t.status !== 'concluido' ? '<span class="selo selo-entregue">✓ entregue — revisar</span>' : ''}</div>
         <h3>${esc(t.titulo)}</h3>
-        <div class="ct-moto">${avatar(t.motoqueiro_id, nome)}<div><b>${esc(nome)}</b><small>${contagem[t.id] || 0} ponto(s) levantado(s)</small></div></div>
+        <div class="ct-moto">${avatar(t.motoqueiro_id, nome)}<div><b>${esc(nome)}</b><small>${contagem[t.id] || 0} ponto(s) levantado(s)</small></div>${(() => {
+    const d = diasComPessoa(t);
+    return d ? `<span class="dias-com ${d.aberta && d.dias >= 7 ? 'muitos' : ''}" title="Desde ${horaBR(d.desde.toISOString())}"><b>${d.dias}</b>${d.dias === 1 ? 'dia' : 'dias'}</span>` : '';
+  })()}</div>
         <p class="ct-meta ${prazoVencido(t.prazo, t.status) ? 'vencido' : ''}">Prazo: ${dataBR(t.prazo)}${prazoVencido(t.prazo, t.status) ? ' · atrasada' : ''}</p>
       </a>`;
     }).join('') : '<p class="vazio">Nenhuma tarefa aqui.</p>';
@@ -242,6 +245,7 @@ export async function telaTarefaLider(el, { id }, ctx) {
       <div class="grade-campos">
         <label>Status<select id="status">${Object.entries(STATUS).map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select></label>
         <label>Prazo<input type="date" id="prazo"></label>
+        <p class="largura-total dias-linha" id="dias-com"></p>
         <label class="largura-total">Motoqueiro<select id="motoqueiro"><option value="">— sem motoqueiro —</option>
           ${equipe.filter((m) => m.papel !== 'bloqueado' || m.id === tarefa.motoqueiro_id).map((m) => `<option value="${m.id}">${esc(m.nome || m.email)}${m.papel === 'lider' ? ' (líder)' : ''}</option>`).join('')}</select></label>
       </div>
@@ -268,6 +272,9 @@ export async function telaTarefaLider(el, { id }, ctx) {
     $('#status', el).value = tarefa.status;
     $('#prazo', el).value = tarefa.prazo || '';
     $('#motoqueiro', el).value = tarefa.motoqueiro_id || '';
+    const d = diasComPessoa(tarefa);
+    const quemTem = equipe.find((m) => m.id === tarefa.motoqueiro_id)?.nome;
+    $('#dias-com', el).innerHTML = d ? `📅 Com <b>${esc(quemTem || 'o motoqueiro')}</b> ${d.texto} <span>(desde ${horaBR(d.desde.toISOString())})</span>` : '';
     const caixa = $('#entrega', el);
     if (tarefa.finalizada_em && tarefa.status !== 'concluido') {
       const quem = equipe.find((m) => m.id === tarefa.motoqueiro_id)?.nome || 'O motoqueiro';
@@ -302,7 +309,11 @@ export async function telaTarefaLider(el, { id }, ctx) {
   };
   $('#status', el).onchange = (e) => salvarCampo({ status: e.target.value }, 'Status atualizado.');
   $('#prazo', el).onchange = (e) => salvarCampo({ prazo: e.target.value || null }, 'Prazo atualizado.');
-  $('#motoqueiro', el).onchange = (e) => salvarCampo({ motoqueiro_id: e.target.value || null }, 'Motoqueiro alterado.');
+  $('#motoqueiro', el).onchange = async (e) => {
+    await salvarCampo({ motoqueiro_id: e.target.value || null }, 'Motoqueiro alterado. A contagem de dias recomeça.');
+    tarefa.atribuida_em = e.target.value ? new Date().toISOString() : null;
+    preencher();
+  };
   $('#b-oficio', el).onclick = () => verOficio(tarefa);
   $('#b-enquadrar', el).onclick = () => poligono && mapa.fitBounds(poligono.getBounds(), { padding: [30, 30] });
   $('#b-excluir', el).onclick = async () => {

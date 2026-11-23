@@ -6,7 +6,9 @@ import { formasDoBloco, blocoParaMapa } from './simbolo.js';
 import {
   comprimentoM, formatarMetros, TIPOS, SITUACOES, CORES,
 } from './rede.js';
-import { esc, dataBR, horaBR } from './util.js';
+import {
+  esc, dataBR, horaBR, diasComPessoa,
+} from './util.js';
 
 const STATUS_TXT = { pendente: 'Pendente', em_andamento: 'Em andamento', concluido: 'Concluído' };
 const AZUL = '#003c78';
@@ -184,6 +186,7 @@ export async function montarRelatorio({ tarefa, equipe, pontos, fotos, urls, red
     ['Prazo', dataBR(tarefa.prazo)],
     ['Entregue pelo motoqueiro', tarefa.finalizada_em ? horaBR(tarefa.finalizada_em) : '—'],
     ['Ofício', esc(tarefa.oficio_nome || '—')],
+    ['Dias com o motoqueiro', (() => { const d = diasComPessoa(tarefa); return d ? `${d.dias} (${d.texto})` : '—'; })()],
   ];
 
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
@@ -207,7 +210,7 @@ export async function montarRelatorio({ tarefa, equipe, pontos, fotos, urls, red
   .selo { display: inline-block; font: 700 8pt Arial; text-transform: uppercase; letter-spacing: .4px; padding: 3px 8px; border-radius: 4px; background: #e1ecf8; color: #003c78; }
   .selo.concluido { background: #dcefe2; color: #2f7d4a; } .selo.pendente { background: #f2e6c9; color: #7a5a12; }
   .selo.previa { background: #fde7cf; color: #9a4a00; margin-left: 6px; }
-  .info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 14px; margin: 10px 0; padding: 10px 12px; border: 1px solid #cddcee; border-radius: 6px; background: #f6f9fd; }
+  .info { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 14px; margin: 10px 0; padding: 10px 12px; border: 1px solid #cddcee; border-radius: 6px; background: #f6f9fd; }
   .info div span { display: block; font-size: 8pt; color: #6b7385; text-transform: uppercase; letter-spacing: .3px; }
   .info div b { font-size: 10pt; color: #1d2433; }
   .obs-final { border-left: 4px solid #2f7d4a; background: #eef7f0; padding: 8px 12px; border-radius: 4px; margin: 8px 0; }

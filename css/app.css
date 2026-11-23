@@ -421,3 +421,30 @@ body.modo-campo .aviso.mostrar { transform: translate(-50%, 0); }
   .acesso-marca h1 { font-size: 1.9rem; }
   .acesso-marca p { display: none; }
 }
+
+/* popups de aviso */
+.avisos-popup { position: fixed; z-index: 3500; top: calc(var(--topo-h) + 10px); right: 12px; display: grid; gap: 10px; width: min(380px, calc(100% - 24px)); pointer-events: none; }
+.app .avisos-popup, body.modo-campo .avisos-popup { top: 70px; }
+.popup-aviso {
+  pointer-events: auto; display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start;
+  background: #fff; border: 1px solid var(--linha); border-left: 5px solid var(--tinta-2); border-radius: 12px;
+  padding: 12px 10px 12px 12px; box-shadow: 0 14px 34px rgba(0, 40, 90, .22); animation: entrar-aviso .25s ease-out;
+}
+.popup-aviso.ok { border-left-color: var(--verde); }
+.popup-aviso.alerta { border-left-color: var(--ambar); }
+.popup-aviso.saindo { opacity: 0; transform: translateX(20px); transition: .25s; }
+.pa-icone { font-size: 1.5rem; line-height: 1; }
+.pa-corpo b { display: block; color: var(--tinta); font-size: 1rem; }
+.pa-corpo span { display: block; color: var(--suave); font-size: .9rem; margin-top: 2px; }
+.pa-abrir { margin-top: 8px; min-height: 34px; }
+.pa-fechar { border: 0; background: none; font-size: 1.4rem; line-height: 1; color: var(--suave); cursor: pointer; padding: 0 4px; }
+@keyframes entrar-aviso { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+.avisos-btn { background: #f5b300 !important; color: #1d2433 !important; }
+@media (max-width: 820px) { .avisos-popup { left: 12px; right: 12px; width: auto; } .avisos-btn { font-size: 0 !important; } .avisos-btn::before { content: '🔔'; font-size: 1rem; } }
+
+/* dias com a pessoa */
+.ct-moto .dias-com { margin-left: auto; display: grid; place-items: center; min-width: 48px; padding: 4px 8px; border-radius: 8px; background: #fff; border: 1px solid var(--linha); color: var(--tinta); font-size: .7rem; line-height: 1.1; text-transform: uppercase; letter-spacing: .3px; }
+.ct-moto .dias-com b { display: block; font: 700 1.3rem var(--titulo); }
+.ct-moto .dias-com.muitos { background: #fde7cf; border-color: #f2c58f; color: #9a4a00; }
+.dias-linha { margin: 0; color: var(--tinta); font-size: .92rem; }
+.dias-linha span { color: var(--suave); font-size: .82rem; }

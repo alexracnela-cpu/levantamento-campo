@@ -1,7 +1,7 @@
 // Service worker do RondaLuz: app funciona sem internet e guarda os pedaços de mapa já vistos.
 // Ao mudar qualquer arquivo do app, aumente a VERSAO para os celulares baixarem a nova.
 
-const VERSAO = 'v15';
+const VERSAO = 'v17';
 const APP = `rondaluz-app-${VERSAO}`;
 const MAPAS = 'rondaluz-mapas';
 const MAX_PEDACOS = 4000;
@@ -30,6 +30,7 @@ const ARQUIVOS = [
   './js/util.js',
   './js/rede.js',
   './js/relatorio.js',
+  './js/avisos.js',
 ];
 const EXTERNOS = [
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
@@ -115,4 +116,21 @@ self.addEventListener('fetch', (e) => {
   if (ehExternoFixo(url)) { e.respondWith(primeiroCache(req)); return; }
   if (url.origin === self.location.origin) { e.respondWith(primeiroRede(req)); }
   // Supabase e demais: direto pela rede (a fila do app cuida do modo offline)
+});
+
+// Toque na notificação: abre (ou traz para frente) o app na tela certa.
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const href = e.notification.data?.href || '';
+  e.waitUntil((async () => {
+    const janelas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const j of janelas) {
+      if (j.url.startsWith(self.registration.scope)) {
+        await j.focus();
+        if (href) j.navigate(self.registration.scope + href);
+        return;
+      }
+    }
+    await self.clients.openWindow(self.registration.scope + href);
+  })());
 });

@@ -120,3 +120,18 @@ export function mensagemErro(e) {
   if (/row-level security|permission denied/i.test(m)) return 'Sem permissão para isso.';
   return m;
 }
+
+// Há quantos dias a tarefa está com a pessoa (para quando ela tocou em Terminei).
+export function diasComPessoa(t) {
+  if (!t?.motoqueiro_id) return null;
+  const inicio = new Date(t.atribuida_em || t.criado_em);
+  const fim = t.finalizada_em ? new Date(t.finalizada_em) : new Date();
+  const dia = (d) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  const dias = Math.max(0, Math.round((dia(fim) - dia(inicio)) / 86400000));
+  const n = dias === 1 ? '1 dia' : `${dias} dias`;
+  let texto;
+  if (t.finalizada_em) texto = dias === 0 ? 'entregue no mesmo dia' : `entregue em ${n}`;
+  else if (t.status === 'concluido') texto = `ficou ${n}`;
+  else texto = dias === 0 ? 'desde hoje' : `há ${n}`;
+  return { dias, texto, desde: inicio, aberta: !t.finalizada_em && t.status !== 'concluido' };
+}
