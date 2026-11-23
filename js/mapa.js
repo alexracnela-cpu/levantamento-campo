@@ -30,7 +30,7 @@ export function criarMapa(el, { centro = MANAUS, zoom = 13 } = {}) {
 export function desenharArea(mapa, area, opcoes = {}) {
   if (!area || area.length < 3) return null;
   return L.polygon(area, {
-    color: '#1f3a6b', weight: 2.5, dashArray: '8 6', fillColor: '#1f3a6b', fillOpacity: 0.07,
+    color: '#003c78', weight: 2.5, dashArray: '8 6', fillColor: '#1f63ad', fillOpacity: 0.07,
     interactive: false, ...opcoes,
   }).addTo(mapa);
 }

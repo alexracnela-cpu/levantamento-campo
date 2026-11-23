@@ -14,7 +14,7 @@ import { deslocar, emMetros } from './util.js';
 
 export const TAMANHO_PADRAO = 2.5; // metros, do centro do poste até a ponta da luminária
 
-const TINTA = '#1f3a6b';
+const TINTA = '#003c78';
 const VERMELHO = '#e00000';
 
 export const PROPORCAO = {

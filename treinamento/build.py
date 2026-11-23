@@ -59,6 +59,11 @@ def css_app():
     css = css.replace('100dvh', '100cqh').replace('100vh', '100cqh')
     css = re.sub(r'@media \(max-width: (\d+)px\)', r'@container app (max-width: \1px)', css)
     assert 'body' not in css.replace('.app', ''), [l for l in css.splitlines() if 'body' in l]
+    for nome in ('fundo-canto.svg', 'fundo-canto-2.svg'):
+        uri = 'data:image/svg+xml;base64,' + base64.b64encode((APP / 'icones' / nome).read_bytes()).decode()
+        css = css.replace(f'url("../icones/{nome}")', f'url("{uri}")')
+    css = css.replace('background-attachment: fixed;', 'background-attachment: local;')
+    assert '../icones/' not in css
     return css
 
 
@@ -74,6 +79,8 @@ def main():
     html = html.replace('/*LEAFLET_CSS*/', (AQUI / 'leaflet.css').read_text())
     html = html.replace('/*APP_CSS*/', css_app())
     html = html.replace('/*ICONE*/', icone)
+    for marca, nome in (('/*CANTO1*/', 'fundo-canto.svg'), ('/*CANTO2*/', 'fundo-canto-2.svg')):
+        html = html.replace(marca, 'data:image/svg+xml;base64,' + base64.b64encode((APP / 'icones' / nome).read_bytes()).decode())
     html = html.replace('/*SCRIPT*/', script.replace('</script>', '<\\/script>'))
     saida = AQUI / 'rondaluz-treinamento.html'
     saida.write_text(html)
