@@ -41,11 +41,13 @@ export const api = {
   tarefa: (id) => sb.from('tarefas').select('*').eq('id', id).maybeSingle().then(ok),
   criarTarefa: (t) => sb.from('tarefas').insert(t).select().single().then(ok),
   alterarTarefa: (id, campos) => sb.from('tarefas').update(campos).eq('id', id).then(ok),
+  devolverTarefa: (id) => sb.from('tarefas').update({ finalizada_em: null, finalizacao_obs: '' }).eq('id', id).then(ok),
   excluirTarefa: (id) => sb.from('tarefas').delete().eq('id', id).then(ok),
   contarPontos: () => sb.from('pontos').select('tarefa_id').then(ok),
 
   // ---- pontos e fotos
   pontos: (tarefaId) => sb.from('pontos').select('*').eq('tarefa_id', tarefaId).order('criado_em').then(ok),
+  redes: (tarefaId) => sb.from('redes').select('*').eq('tarefa_id', tarefaId).order('criado_em').then(ok),
   fotos: (tarefaId) => sb.from('fotos').select('*').eq('tarefa_id', tarefaId).order('criado_em').then(ok),
 
   // ---- arquivos

@@ -7,7 +7,7 @@ APP = Path(__file__).resolve().parent.parent
 AQUI = Path(__file__).parent
 
 # ordem de dependência; store.js é trocado pela versão em memória
-MODULOS = ['util', 'store', 'api', 'sync', 'simbolo', 'mapa', 'comum', 'lider', 'motoqueiro', 'app']
+MODULOS = ['util', 'store', 'api', 'sync', 'simbolo', 'rede', 'mapa', 'comum', 'lider', 'motoqueiro', 'app']
 
 CRIAR_MAPA_DEMO = '''export function criarMapa(el, { centro = MANAUS, zoom = 17 } = {}) {
   const mapa = L.map(el, { zoomControl: true, minZoom: 15, maxZoom: 22 }).setView(centro, zoom);

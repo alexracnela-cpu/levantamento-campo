@@ -127,6 +127,9 @@ async function semear() {
         observacoes: i === 1 ? 'Braço torto' : '', fora_da_area: false, criado_por: UID.carla, criado_em: iso(3000 - i), atualizado_em: iso(3000 - i),
       })),
     ],
+    redes: [
+      { id: 'r-1', tarefa_id: t1, tipo: 'secundaria', situacao: 'existente', pontos: [em(-70, 11), em(35, -11)].map((p) => [...p]), observacoes: '', criado_por: UID.joao, criado_em: iso(25), atualizado_em: iso(25) },
+    ],
     fotos: [{ id: 'f-1', ponto_id: 'p-1', tarefa_id: t1, path: `${t1}/p-1/f-1.jpg`, criado_por: UID.joao, criado_em: iso(39) }],
   };
   DB.arquivos.set(`oficios/${t1}/oficio-0043-2026.png`, await gerarOficio());
@@ -151,6 +154,7 @@ function apagarEmCascata(tabela, linha) {
   notificar(tabela, 'DELETE', linha);
   if (tabela === 'tarefas') {
     d.pontos.filter((p) => p.tarefa_id === linha.id).forEach((p) => apagarEmCascata('pontos', p));
+    d.redes.filter((r) => r.tarefa_id === linha.id).forEach((r) => apagarEmCascata('redes', r));
   }
   if (tabela === 'pontos') {
     d.fotos.filter((f) => f.ponto_id === linha.id).forEach((f) => apagarEmCascata('fotos', f));
@@ -168,12 +172,12 @@ function criarSb(inst) {
     if (p === 'lider') return true;
     if (t === 'perfis') return ativo() || r.id === inst.uid;
     if (t === 'tarefas') return ativo() && r.motoqueiro_id === inst.uid;
-    if (t === 'pontos' || t === 'fotos') return tarefaMinha(r.tarefa_id);
+    if (t === 'pontos' || t === 'fotos' || t === 'redes') return tarefaMinha(r.tarefa_id);
     return false;
   };
   const podeEscrever = (t, r) => {
     if (papel() === 'lider') return true;
-    if (t === 'pontos' || t === 'fotos') return tarefaMinha(r.tarefa_id);
+    if (t === 'pontos' || t === 'fotos' || t === 'redes') return tarefaMinha(r.tarefa_id);
     return false;
   };
   const chave = (t) => (t === 'convites' ? 'email' : 'id');
@@ -224,7 +228,7 @@ function criarSb(inst) {
           const atual = tab.find((r) => r[k] === v[k]);
           if (!podeEscrever(t, atual ? { ...atual, ...v } : v)) return negado;
           if (atual && this.op === 'upsert') {
-            Object.assign(atual, v, t === 'pontos' ? { atualizado_em: agora } : {});
+            Object.assign(atual, v, t === 'pontos' || t === 'redes' ? { atualizado_em: agora } : {});
             saida.push(atual);
             notificar(t, 'UPDATE', atual);
           } else if (atual) {
@@ -234,7 +238,7 @@ function criarSb(inst) {
               ...(t === 'convites' ? {} : { id: crypto.randomUUID() }),
               criado_em: agora,
               ...(t === 'tarefas' ? { status: 'pendente', descricao: '', criado_por: inst.uid } : {}),
-              ...(t === 'pontos' ? { atualizado_em: agora, criado_por: inst.uid } : {}),
+              ...(t === 'pontos' || t === 'redes' ? { atualizado_em: agora, criado_por: inst.uid } : {}),
               ...(t === 'convites' ? { convidado_por: inst.uid, usado_em: null } : {}),
               ...v,
             };
@@ -267,7 +271,27 @@ function criarSb(inst) {
 
   const sessao = () => ({ user: { id: inst.uid, email: DB.dados.perfis.find((p) => p.id === inst.uid)?.email } });
 
+  async function rpc(nome, args) {
+    await espera(120);
+    if (!inst.online) return semRede;
+    const t = DB.dados.tarefas.find((x) => x.id === args.t);
+    if (!t) return { data: null, error: { message: 'Tarefa não encontrada' } };
+    if (nome === 'finalizar_tarefa') {
+      if (!tarefaMinha(t.id)) return { data: null, error: { message: 'Esta tarefa não é sua.' } };
+      Object.assign(t, { finalizada_em: new Date().toISOString(), finalizacao_obs: args.obs || '' });
+      if (t.status === 'pendente') t.status = 'em_andamento';
+      notificar('tarefas', 'UPDATE', t);
+    } else if (nome === 'iniciar_tarefa') {
+      if ((tarefaMinha(t.id) || papel() === 'lider') && t.status === 'pendente') {
+        t.status = 'em_andamento';
+        notificar('tarefas', 'UPDATE', t);
+      }
+    }
+    return { data: null, error: null };
+  }
+
   return {
+    rpc,
     from: (t) => new Consulta(t),
     storage: {
       from(bucket) {

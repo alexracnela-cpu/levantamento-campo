@@ -1,7 +1,7 @@
 // Service worker do RondaLuz: app funciona sem internet e guarda os pedaços de mapa já vistos.
 // Ao mudar qualquer arquivo do app, aumente a VERSAO para os celulares baixarem a nova.
 
-const VERSAO = 'v9';
+const VERSAO = 'v10';
 const APP = `rondaluz-app-${VERSAO}`;
 const MAPAS = 'rondaluz-mapas';
 const MAX_PEDACOS = 4000;
@@ -26,6 +26,7 @@ const ARQUIVOS = [
   './js/store.js',
   './js/sync.js',
   './js/util.js',
+  './js/rede.js',
 ];
 const EXTERNOS = [
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',

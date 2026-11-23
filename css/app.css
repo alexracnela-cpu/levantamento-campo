@@ -329,3 +329,30 @@ body.modo-campo .aviso.mostrar { transform: translate(-50%, 0); }
   .membro { grid-template-columns: 1fr auto; }
   .botoes-membro { grid-column: 1 / -1; justify-content: flex-start; }
 }
+
+/* rede */
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin: 8px 0; border: 1.5px solid var(--tinta); border-radius: var(--raio); overflow: hidden; }
+.seg button {
+  display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; border: 0;
+  background: #fffdf8; color: var(--tinta); font: 600 .92rem var(--corpo); cursor: pointer;
+}
+.seg button + button { border-left: 1.5px solid var(--tinta); }
+.seg button[aria-pressed=true] { background: var(--tinta); color: #fff; }
+.seg button i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 2px solid #fff; }
+.medida-rede { font: 700 1rem var(--corpo); color: var(--suave); white-space: nowrap; }
+.vertice-rede { background: #fff; border: 3px solid var(--tinta); border-radius: 3px; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+.legenda-rede { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .82rem; color: var(--suave); margin-top: 8px; }
+.legenda-rede span { display: inline-flex; align-items: center; gap: 6px; }
+.legenda-rede i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.resumo-redes ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.resumo-redes li { display: flex; align-items: center; gap: 8px; }
+.resumo-redes li b { margin-left: auto; }
+.campo-acoes .btn:not(.redondo) { min-height: 44px; border-radius: 22px; box-shadow: var(--sombra); }
+
+/* entrega do motoqueiro */
+.selo-entregue { background: #dcefe2; color: var(--verde); }
+.aviso-entrega { background: #e9f5ec; border: 1.5px solid #9fcfac; border-left: 5px solid var(--verde); border-radius: var(--raio); padding: 10px 12px; margin: 10px 0; }
+.aviso-entrega b { color: var(--verde); }
+.aviso-entrega p { margin: 6px 0 0; font-style: italic; }
+.resumo-entrega { padding-left: 18px; }
+.alerta-texto { color: #9a4a00; font-weight: 600; }

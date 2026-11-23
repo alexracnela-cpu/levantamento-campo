@@ -8,8 +8,12 @@ import {
 } from './simbolo.js';
 import { abrirModal, confirmar, verOficio, guardarOficio, seloStatus } from './comum.js';
 import {
-  salvarPonto, excluirPonto, adicionarFoto, removerFotoLocal, aoMudarFila, estadoFila,
+  salvarPonto, excluirPonto, adicionarFoto, removerFotoLocal, aoMudarFila, estadoFila, salvarRede, excluirRede,
+  finalizarTarefa,
 } from './sync.js';
+import {
+  RedeNoMapa, TIPOS, SITUACOES, CORES, svgLinha, formatarMetros,
+} from './rede.js';
 import {
   $, $$, esc, aviso, dataBR, prazoVencido, novoId, dentroDoPoligono, comprimirFoto, mensagemErro,
 } from './util.js';
@@ -30,7 +34,7 @@ export async function telaMinhas(el, _p, ctx) {
     $('#lista', el).innerHTML = (offline ? '<p class="dica">Sem internet: mostrando a última lista guardada.</p>' : '')
       + (tarefas.length ? tarefas.map((t) => `
       <a class="cartao-tarefa" href="#/campo/${t.id}">
-        <div class="ct-topo">${seloStatus(t.status)}</div>
+        <div class="ct-topo">${seloStatus(t.status)}${t.finalizada_em ? ' <span class="selo selo-entregue">✓ entregue</span>' : ''}</div>
         <h3>${esc(t.titulo)}</h3>
         ${t.descricao ? `<p class="ct-desc">${esc(t.descricao)}</p>` : ''}
         <p class="ct-meta ${prazoVencido(t.prazo, t.status) ? 'vencido' : ''}">Prazo: ${dataBR(t.prazo)}${t.oficio_path ? ' · 📄 ofício' : ''}</p>
@@ -83,12 +87,14 @@ export async function telaCampo(el, { id }, ctx) {
     <div id="mapa" class="mapa"></div>
     <div class="campo-topo">
       <a class="btn redondo" href="#/minhas" aria-label="Voltar">←</a>
-      <div class="campo-titulo"><b>${esc(tarefa.titulo)}</b><span>${seloStatus(tarefa.status)} <span id="campo-contagem"></span> <span id="campo-sinc" class="chip-sinc"></span></span></div>
+      <div class="campo-titulo"><b>${esc(tarefa.titulo)}</b><span>${seloStatus(tarefa.status)} <span id="campo-entregue" class="selo selo-entregue" ${tarefa.finalizada_em ? '' : 'hidden'}>✓ entregue</span> <span id="campo-contagem"></span> <span id="campo-sinc" class="chip-sinc"></span></span></div>
       <button class="btn redondo" id="b-oficio" aria-label="Ver ofício" ${tarefa.oficio_path ? '' : 'disabled'}>📄</button>
     </div>
     <div class="campo-acoes">
       <button class="btn redondo grande" id="b-gps" aria-label="Minha posição">◎</button>
       <button class="btn redondo grande" id="b-area" aria-label="Ver área">▢</button>
+      <button class="btn" id="b-terminei">✓ Terminei</button>
+      <button class="btn" id="b-rede">〰 Desenhar rede</button>
       <button class="btn primario" id="b-aqui">+ Ponto onde estou</button>
     </div>
     <div class="campo-dica" id="dica">Toque no mapa para marcar um ponto.</div>
@@ -152,15 +158,55 @@ export async function telaCampo(el, { id }, ctx) {
     return lista;
   };
 
+  // ---- rede: servidor + fila do celular
+  const redes = new Map();
+  let redeSel = null;
+  let desenhando = false;
+  let pontosAntes = [];
+
+  const carregarRedes = async () => {
+    let lista = (await local.cacheLer(`redes:${id}`)) || [];
+    if (navigator.onLine) {
+      try {
+        const srv = await api.redes(id);
+        const fila = await local.todos('fila');
+        const pend = new Map(fila.filter((f) => f.dados.tarefa_id === id && (f.tipo === 'rede' || f.tipo === 'excluir_rede')).map((f) => [f.id, f]));
+        lista = srv.filter((r) => pend.get(r.id)?.tipo !== 'excluir_rede')
+          .map((r) => (pend.get(r.id)?.tipo === 'rede' ? { ...r, ...pend.get(r.id).dados } : r));
+        pend.forEach((f, rid) => { if (f.tipo === 'rede' && !lista.some((r) => r.id === rid)) lista.push(f.dados); });
+        await local.cacheGravar(`redes:${id}`, lista);
+      } catch { /* segue com a cópia local */ }
+    }
+    return lista;
+  };
+
   const numeroDo = (pid) => [...simbolos.keys()].indexOf(pid) + 1;
   const atualizarResumo = () => {
-    $('#campo-contagem', el).textContent = `${simbolos.size} ponto(s)`;
+    const metros = [...redes.values()].reduce((t, r) => t + r.comprimento, 0);
+    $('#campo-contagem', el).textContent = `${simbolos.size} ponto(s)${redes.size ? ` · ${formatarMetros(metros)} de rede` : ''}`;
   };
+
+  const criarRede = (r) => {
+    const rd = new RedeNoMapa(mapa, r, {
+      editavel: true,
+      aoTocar: (alvo, ll) => {
+        if (desenhando) { adicionarVertice([ll.lat, ll.lng]); return; }
+        selecionarRede(alvo);
+      },
+      aoMudar: (alvo) => { salvarRede(alvo.rede); atualizarResumo(); if (redeSel === alvo) renderFicha(); },
+    });
+    redes.set(r.id, rd);
+    return rd;
+  };
+  (await carregarRedes()).forEach(criarRede);
 
   const criarSimbolo = (p) => {
     const s = new SimboloNoMapa(mapa, p, {
       editavel: true,
-      aoTocar: (simb) => selecionar(simb),
+      aoTocar: (simb) => {
+        if (desenhando) { adicionarVertice(simb.latlng); return; } // encaixa a rede no centro do poste
+        selecionar(simb);
+      },
       aoMudar: (simb) => preencherNumeros(simb),
       aoSoltar: (simb) => gravar(simb, true),
     });
@@ -229,7 +275,60 @@ export async function telaCampo(el, { id }, ctx) {
     });
   };
 
+  const renderFichaRede = () => {
+    const rd = redeSel;
+    const r = rd.rede;
+    ficha.hidden = false;
+    const dica = desenhando
+      ? (r.pontos.length
+        ? 'Toque no próximo poste ou ponto do mapa. Tocar num poste encaixa a rede no centro dele.'
+        : 'Toque no poste (ou ponto do mapa) onde a rede começa.')
+      : 'Arraste os quadradinhos para ajustar o traçado.';
+    ficha.innerHTML = `
+      <div class="ficha-alca"></div>
+      <div class="ficha-topo">
+        <div class="ficha-titulo">${svgLinha(r.tipo, r.situacao, 40)}<b>${desenhando ? 'Nova rede' : 'Rede'}</b></div>
+        <span class="medida-rede">${formatarMetros(rd.comprimento)}</span>
+        <button class="btn primario" id="r-pronto">${desenhando ? 'Concluir' : 'Pronto'}</button>
+      </div>
+      <p class="ficha-dica">${dica}</p>
+      <div class="seg" role="group" aria-label="Tipo de rede">
+        ${Object.entries(TIPOS).map(([v, t]) => `<button type="button" data-tipo="${v}" aria-pressed="${r.tipo === v}">${svgLinha(v, r.situacao, 28)} ${t}</button>`).join('')}
+      </div>
+      <div class="seg" role="group" aria-label="Situação da rede">
+        ${Object.entries(SITUACOES).map(([v, t]) => `<button type="button" data-situacao="${v}" aria-pressed="${r.situacao === v}"><i style="background:${CORES[v]}"></i> ${t}</button>`).join('')}
+      </div>
+      <div class="linha-botoes">
+        ${desenhando
+    ? `<button class="btn" id="r-desfazer" ${r.pontos.length ? '' : 'disabled'}>↶ Desfazer</button><button class="btn" id="r-cancelar">Cancelar</button>`
+    : '<button class="btn" id="r-continuar">+ Continuar desenhando</button><button class="btn perigo" id="r-excluir">Excluir rede</button>'}
+      </div>`;
+    const salvarSeValida = () => { if (rd.rede.pontos.length >= 2) salvarRede(rd.rede); atualizarResumo(); };
+    $$('[data-tipo]', ficha).forEach((b) => {
+      b.onclick = () => { rd.atualizar({ tipo: b.dataset.tipo }); localStorage.setItem('rondaluz-rede-tipo', b.dataset.tipo); salvarSeValida(); renderFicha(); };
+    });
+    $$('[data-situacao]', ficha).forEach((b) => {
+      b.onclick = () => { rd.atualizar({ situacao: b.dataset.situacao }); localStorage.setItem('rondaluz-rede-situacao', b.dataset.situacao); salvarSeValida(); renderFicha(); };
+    });
+    $('#r-pronto', ficha).onclick = () => (desenhando ? concluirRede() : selecionarRede(null));
+    if (desenhando) {
+      $('#r-desfazer', ficha).onclick = () => { rd.desfazer(); salvarSeValida(); renderFicha(); };
+      $('#r-cancelar', ficha).onclick = () => {
+        desenhando = false;
+        if (pontosAntes.length >= 2) { rd.atualizar({ pontos: pontosAntes }); salvarRede(rd.rede); selecionarRede(null); } else { apagarRede(rd); }
+        atualizarResumo();
+      };
+    } else {
+      $('#r-continuar', ficha).onclick = () => { pontosAntes = rd.rede.pontos.map((p) => [...p]); desenhando = true; selecionarRede(rd); };
+      $('#r-excluir', ficha).onclick = async () => {
+        if (!await confirmar(`Excluir esta rede (${formatarMetros(rd.comprimento)})?`, 'Excluir')) return;
+        apagarRede(rd);
+      };
+    }
+  };
+
   const renderFicha = () => {
+    if (redeSel) { renderFichaRede(); return; }
     if (!selecionado) { ficha.hidden = true; return; }
     const p = selecionado.ponto;
     ficha.hidden = false;
@@ -330,7 +429,68 @@ export async function telaCampo(el, { id }, ctx) {
     renderFotos();
   };
 
+  function apagarRede(rd) {
+    excluirRede(rd.rede);
+    rd.remover();
+    redes.delete(rd.rede.id);
+    redeSel = null;
+    desenhando = false;
+    mapa.getContainer().classList.remove('desenhando');
+    el.querySelector('.tela-campo').classList.toggle('com-ficha', !!selecionado);
+    renderFicha();
+    atualizarResumo();
+  }
+
+  function selecionarRede(rd) {
+    if (redeSel && redeSel !== rd) redeSel.selecionar(false);
+    if (rd && selecionado) { selecionado.selecionar(false); salvarPonto(selecionado.ponto); selecionado = null; }
+    redeSel = rd;
+    if (rd) rd.selecionar(true);
+    if (!rd) desenhando = false;
+    mapa.getContainer().classList.toggle('desenhando', desenhando && !!rd);
+    el.querySelector('.tela-campo').classList.toggle('com-ficha', !!(rd || selecionado));
+    renderFicha();
+  }
+
+  function adicionarVertice(ll) {
+    if (!redeSel) return;
+    redeSel.adicionarVertice(ll);
+    if (redeSel.rede.pontos.length >= 2) salvarRede(redeSel.rede);
+    atualizarResumo();
+    renderFicha();
+  }
+
+  function iniciarRede() {
+    selecionar(null);
+    const r = {
+      id: novoId(),
+      tarefa_id: id,
+      tipo: localStorage.getItem('rondaluz-rede-tipo') || 'secundaria',
+      situacao: localStorage.getItem('rondaluz-rede-situacao') || 'existente',
+      pontos: [],
+      observacoes: '',
+    };
+    pontosAntes = [];
+    desenhando = true;
+    selecionarRede(criarRede(r));
+  }
+
+  function concluirRede() {
+    const rd = redeSel;
+    desenhando = false;
+    if (rd.rede.pontos.length < 2) {
+      aviso('A rede precisa de pelo menos 2 pontos. Desenho descartado.');
+      apagarRede(rd);
+      return;
+    }
+    salvarRede(rd.rede);
+    aviso(`Rede salva: ${formatarMetros(rd.comprimento)}.`, 'ok');
+    selecionarRede(null);
+    atualizarResumo();
+  }
+
   function selecionar(s) {
+    if (s && redeSel) { redeSel.selecionar(false); redeSel = null; desenhando = false; }
     if (selecionado && selecionado !== s) {
       selecionado.selecionar(false);
       salvarPonto(selecionado.ponto);
@@ -369,9 +529,37 @@ export async function telaCampo(el, { id }, ctx) {
   };
 
   mapa.on('click', (e) => {
+    if (desenhando) { adicionarVertice([e.latlng.lat, e.latlng.lng]); return; }
+    if (redeSel) { selecionarRede(null); return; }
     if (selecionado) { selecionar(null); return; }
     novoPonto(e.latlng.lat, e.latlng.lng);
   });
+  $('#b-rede', el).onclick = () => iniciarRede();
+  $('#b-terminei', el).onclick = () => {
+    const metros = [...redes.values()].reduce((t, r) => t + r.comprimento, 0);
+    const semPlaqueta = [...simbolos.values()].filter((s) => !s.ponto.plaqueta).length;
+    const { caixa, fechar } = abrirModal(`<h3>Terminar o levantamento?</h3>
+      <p>O líder vai ser avisado de que você terminou <b>${esc(tarefa.titulo)}</b>.</p>
+      <ul class="resumo-entrega">
+        <li><b>${simbolos.size}</b> ponto(s)${semPlaqueta ? ` · <span class="alerta-texto">${semPlaqueta} sem plaqueta</span>` : ''}</li>
+        <li><b>${formatarMetros(metros)}</b> de rede desenhada</li>
+      </ul>
+      <label>Observação final (opcional)<textarea id="m-obs" rows="3" placeholder="Ex.: rua sem saída no fim do trecho, 2 postes sem acesso…"></textarea></label>
+      <div class="linha-botoes"><button class="btn" id="m-nao">Voltar</button><button class="btn primario" id="m-sim">✓ Terminei</button></div>`);
+    $('#m-nao', caixa).onclick = fechar;
+    $('#m-sim', caixa).onclick = async () => {
+      const obs = $('#m-obs', caixa).value.trim();
+      fechar();
+      if (selecionado) selecionar(null);
+      if (redeSel) selecionarRede(null);
+      await finalizarTarefa(id, obs);
+      tarefa.finalizada_em = new Date().toISOString();
+      tarefa.finalizacao_obs = obs;
+      await local.cacheGravar(`tarefa:${id}`, tarefa);
+      $('#campo-entregue', el).hidden = false;
+      aviso(navigator.onLine ? 'Pronto! O líder foi avisado.' : 'Guardado. O líder é avisado quando a internet voltar.', 'ok');
+    };
+  };
   $('#b-aqui', el).onclick = () => {
     if (!gps.ultima) { aviso('Ainda sem posição do GPS.'); return; }
     if (selecionado) selecionar(null);
@@ -398,6 +586,7 @@ export async function telaCampo(el, { id }, ctx) {
 
   return () => {
     if (selecionado) salvarPonto(selecionado.ponto);
+    if (redeSel && redeSel.rede.pontos.length >= 2) salvarRede(redeSel.rede);
     pararFila();
     gps.parar();
     urlsLocais.forEach((u) => URL.revokeObjectURL(u));

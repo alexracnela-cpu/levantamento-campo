@@ -53,6 +53,44 @@ export async function excluirPonto(ponto) {
   sincronizar();
 }
 
+export async function salvarRede(rede) {
+  const registro = {
+    id: rede.id,
+    tarefa_id: rede.tarefa_id,
+    tipo: rede.tipo,
+    situacao: rede.situacao,
+    pontos: rede.pontos,
+    observacoes: rede.observacoes || '',
+  };
+  await local.gravar('fila', { id: rede.id, tipo: 'rede', dados: registro, em: Date.now() });
+  const k = `redes:${rede.tarefa_id}`;
+  const lista = (await local.cacheLer(k)) || [];
+  const i = lista.findIndex((x) => x.id === rede.id);
+  if (i >= 0) lista[i] = { ...lista[i], ...registro };
+  else lista.push(registro);
+  await local.cacheGravar(k, lista);
+  await avisar();
+  sincronizar();
+}
+
+export async function excluirRede(rede) {
+  await local.gravar('fila', { id: rede.id, tipo: 'excluir_rede', dados: { id: rede.id, tarefa_id: rede.tarefa_id }, em: Date.now() });
+  const k = `redes:${rede.tarefa_id}`;
+  const lista = (await local.cacheLer(k)) || [];
+  await local.cacheGravar(k, lista.filter((r) => r.id !== rede.id));
+  await avisar();
+  sincronizar();
+}
+
+// O motoqueiro avisa que terminou. Vai para o fim da fila: só sobe depois dos pontos.
+export async function finalizarTarefa(tarefaId, obs) {
+  await local.gravar('fila', { id: `finalizar:${tarefaId}`, tipo: 'finalizar', dados: { tarefa_id: tarefaId, obs: obs || '' }, em: Date.now() });
+  await avisar();
+  sincronizar();
+}
+
+const tarefasIniciadas = new Set();
+
 export async function adicionarFoto(foto) {
   // foto = { id, ponto_id, tarefa_id, blob }
   await local.gravar('fotos', { ...foto, enviada: false, em: Date.now() });
@@ -96,6 +134,19 @@ export async function sincronizar() {
     for (const item of fila) {
       if (item.tipo === 'ponto') {
         const { error } = await sb.from('pontos').upsert(item.dados, { onConflict: 'id' });
+        if (error) throw error;
+        if (!tarefasIniciadas.has(item.dados.tarefa_id)) {
+          tarefasIniciadas.add(item.dados.tarefa_id);
+          await sb.rpc('iniciar_tarefa', { t: item.dados.tarefa_id }); // pendente -> em andamento
+        }
+      } else if (item.tipo === 'finalizar') {
+        const { error } = await sb.rpc('finalizar_tarefa', { t: item.dados.tarefa_id, obs: item.dados.obs });
+        if (error) throw error;
+      } else if (item.tipo === 'rede') {
+        const { error } = await sb.from('redes').upsert(item.dados, { onConflict: 'id' });
+        if (error) throw error;
+      } else if (item.tipo === 'excluir_rede') {
+        const { error } = await sb.from('redes').delete().eq('id', item.id);
         if (error) throw error;
       } else if (item.tipo === 'excluir') {
         const { data: fotos } = await sb.from('fotos').select('path').eq('ponto_id', item.id);

@@ -3,6 +3,9 @@
 import { api } from './api.js';
 import { criarMapa, desenharArea, DesenhoDeArea } from './mapa.js';
 import { SimboloNoMapa } from './simbolo.js';
+import {
+  RedeNoMapa, TIPOS, SITUACOES, svgLinha, legendaRede, comprimentoM, formatarMetros,
+} from './rede.js';
 import { abrirModal, confirmar, verOficio, seloStatus } from './comum.js';
 import {
   $, $$, esc, aviso, dataBR, horaBR, prazoVencido, novoId, nomeArquivoSeguro, mensagemErro, STATUS,
@@ -34,7 +37,7 @@ export async function telaPainel(el, _p, ctx) {
     const lista = tarefas.filter((t) => filtro === 'todas' || t.status === filtro);
     $('#lista', el).innerHTML = lista.length ? lista.map((t) => `
       <a class="cartao-tarefa" href="#/tarefa/${t.id}">
-        <div class="ct-topo">${seloStatus(t.status)}<span class="ct-pontos">${contagem[t.id] || 0} ponto(s)</span></div>
+        <div class="ct-topo">${seloStatus(t.status)}${t.finalizada_em && t.status !== 'concluido' ? ' <span class="selo selo-entregue">✓ entregue — revisar</span>' : ''}<span class="ct-pontos">${contagem[t.id] || 0} ponto(s)</span></div>
         <h3>${esc(t.titulo)}</h3>
         <p class="ct-meta">Motoqueiro: <b>${esc(equipe[t.motoqueiro_id]?.nome || '— sem motoqueiro —')}</b></p>
         <p class="ct-meta ${prazoVencido(t.prazo, t.status) ? 'vencido' : ''}">Prazo: ${dataBR(t.prazo)}${prazoVencido(t.prazo, t.status) ? ' · atrasada' : ''}</p>
@@ -203,6 +206,7 @@ export async function telaTarefaLider(el, { id }, ctx) {
       <a class="voltar" href="#/painel">← Levantamentos</a>
       <h2 id="titulo"></h2>
       <p id="descricao" class="descricao"></p>
+      <div id="entrega"></div>
       <div class="grade-campos">
         <label>Status<select id="status">${Object.entries(STATUS).map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select></label>
         <label>Prazo<input type="date" id="prazo"></label>
@@ -213,6 +217,8 @@ export async function telaTarefaLider(el, { id }, ctx) {
         <button class="btn" id="b-oficio" ${tarefa.oficio_path ? '' : 'disabled'}>📄 Ver ofício</button>
         <button class="btn" id="b-enquadrar">Ver área inteira</button>
       </div>
+      <h3 class="titulo-secao">Rede desenhada</h3>
+      <div id="redes" class="resumo-redes"></div>
       <h3 class="titulo-secao">Pontos levantados <span id="n-pontos" class="contador">0</span></h3>
       <ol id="pontos" class="lista-pontos"></ol>
       <div class="zona-perigo"><button class="btn perigo" id="b-excluir">Excluir tarefa</button></div>
@@ -229,6 +235,28 @@ export async function telaTarefaLider(el, { id }, ctx) {
     $('#status', el).value = tarefa.status;
     $('#prazo', el).value = tarefa.prazo || '';
     $('#motoqueiro', el).value = tarefa.motoqueiro_id || '';
+    const caixa = $('#entrega', el);
+    if (tarefa.finalizada_em && tarefa.status !== 'concluido') {
+      const quem = equipe.find((m) => m.id === tarefa.motoqueiro_id)?.nome || 'O motoqueiro';
+      caixa.innerHTML = `<div class="aviso-entrega">
+        <b>✓ ${esc(quem)} terminou em ${horaBR(tarefa.finalizada_em)}</b>
+        ${tarefa.finalizacao_obs ? `<p>"${esc(tarefa.finalizacao_obs)}"</p>` : ''}
+        <div class="linha-botoes"><button class="btn primario" id="b-concluir">Marcar como concluída</button>
+        <button class="btn" id="b-devolver">Devolver ao motoqueiro</button></div></div>`;
+      $('#b-concluir', caixa).onclick = () => salvarCampo({ status: 'concluido' }, 'Tarefa concluída.').then(preencher);
+      $('#b-devolver', caixa).onclick = async () => {
+        if (!await confirmar('Devolver a tarefa ao motoqueiro? Ela volta a aparecer como não entregue.', 'Devolver')) return;
+        try {
+          await api.devolverTarefa(id);
+          Object.assign(tarefa, { finalizada_em: null, finalizacao_obs: '' });
+          if (tarefa.status === 'concluido') await salvarCampo({ status: 'em_andamento' }, 'Tarefa devolvida.');
+          else aviso('Tarefa devolvida ao motoqueiro.', 'ok');
+          preencher();
+        } catch (e) { aviso(mensagemErro(e), 'erro'); }
+      };
+    } else if (tarefa.finalizada_em) {
+      caixa.innerHTML = `<p class="dica">✓ Entregue pelo motoqueiro em ${horaBR(tarefa.finalizada_em)}${tarefa.finalizacao_obs ? ` — "${esc(tarefa.finalizacao_obs)}"` : ''}</p>`;
+    } else caixa.innerHTML = '';
   };
   preencher();
 
@@ -255,6 +283,8 @@ export async function telaTarefaLider(el, { id }, ctx) {
   };
 
   const simbolos = new Map();
+  const linhasRede = new Map();
+  let redes = [];
   let pontos = [];
   let fotos = [];
   let urls = {};
@@ -269,7 +299,30 @@ export async function telaTarefaLider(el, { id }, ctx) {
     el.querySelector(`.lista-pontos li[data-id="${pid}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   };
 
+  const renderRedes = () => {
+    const vivas = new Set(redes.map((r) => r.id));
+    linhasRede.forEach((l, rid) => { if (!vivas.has(rid)) { l.remover(); linhasRede.delete(rid); } });
+    redes.forEach((r) => {
+      const l = linhasRede.get(r.id);
+      if (l) l.atualizar(r);
+      else {
+        linhasRede.set(r.id, new RedeNoMapa(mapa, r, {
+          aoTocar: (alvo) => { linhasRede.forEach((x) => x.selecionar(x === alvo)); mapa.fitBounds(alvo.linha.getBounds(), { padding: [60, 60], maxZoom: 20 }); },
+        }));
+      }
+    });
+    simbolos.forEach((s) => s.grupo.bringToFront());
+    const somas = {};
+    redes.forEach((r) => { const k = `${r.tipo}|${r.situacao}`; somas[k] = (somas[k] || 0) + comprimentoM(r.pontos); });
+    const linhas = Object.entries(somas).map(([k, m]) => {
+      const [tipo, sit] = k.split('|');
+      return `<li>${svgLinha(tipo, sit)} ${TIPOS[tipo]} ${SITUACOES[sit].toLowerCase()} <b>${formatarMetros(m)}</b></li>`;
+    });
+    $('#redes', el).innerHTML = linhas.length ? `<ul>${linhas.join('')}</ul>${legendaRede()}` : '<p class="dica">Nenhuma rede desenhada ainda.</p>';
+  };
+
   const render = () => {
+    renderRedes();
     const vivos = new Set(pontos.map((p) => p.id));
     simbolos.forEach((s, pid) => { if (!vivos.has(pid)) { s.remover(); simbolos.delete(pid); } });
     pontos.forEach((p) => {
@@ -304,7 +357,7 @@ export async function telaTarefaLider(el, { id }, ctx) {
 
   const carregar = async () => {
     try {
-      [pontos, fotos] = await Promise.all([api.pontos(id), api.fotos(id)]);
+      [pontos, fotos, redes] = await Promise.all([api.pontos(id), api.fotos(id), api.redes(id).catch(() => [])]);
       const faltando = fotos.map((f) => f.path).filter((p) => !urls[p]);
       if (faltando.length) Object.assign(urls, await api.urlsFotos(faltando));
       if (idsConhecidos) {
@@ -321,6 +374,7 @@ export async function telaTarefaLider(el, { id }, ctx) {
   const parar = api.ouvir(`tarefa-${id}`, [
     { tabela: 'pontos', filtro: `tarefa_id=eq.${id}` },
     { tabela: 'fotos', filtro: `tarefa_id=eq.${id}` },
+    { tabela: 'redes', filtro: `tarefa_id=eq.${id}` },
     { tabela: 'tarefas', filtro: `id=eq.${id}` },
   ], (tabela, p) => {
     if (tabela === 'tarefas' && p.new && p.new.id) { tarefa = { ...tarefa, ...p.new }; preencher(); return; }
