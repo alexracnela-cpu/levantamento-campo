@@ -281,7 +281,7 @@ export async function telaTarefaLider(el, { id }, ctx) {
     $('#pontos', el).innerHTML = pontos.length ? pontos.map((p, i) => {
       const fs = fotos.filter((f) => f.ponto_id === p.id);
       return `<li data-id="${p.id}">
-        <div class="lp-topo"><b>Ponto ${i + 1}</b>
+        <div class="lp-topo"><b>${p.plaqueta ? `Plaqueta ${esc(p.plaqueta)}` : `Ponto ${i + 1}`}</b>
           ${p.fora_da_area ? '<span class="selo selo-alerta">fora da área</span>' : ''}
           <span class="lp-hora">${horaBR(p.criado_em)}</span></div>
         <div class="lp-meta">${p.tamanho_m} m · rumo ${Math.round(p.rotacao)}°</div>

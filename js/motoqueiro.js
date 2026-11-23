@@ -236,7 +236,9 @@ export async function telaCampo(el, { id }, ctx) {
     ficha.innerHTML = `
       <div class="ficha-alca"></div>
       <div class="ficha-topo">
-        <div class="ficha-titulo">${svgSimbolo(18)}<b>Ponto ${numeroDo(p.id)}</b></div>
+        <label class="ficha-titulo" title="Número da plaqueta">${svgSimbolo(18)}
+          <input id="f-plaqueta" class="ficha-plaqueta" maxlength="30" autocomplete="off" autocapitalize="characters"
+            placeholder="Ponto ${numeroDo(p.id)} · nº plaqueta" value="${esc(p.plaqueta || '')}" aria-label="Número da plaqueta"></label>
         ${p.fora_da_area ? '<span class="selo selo-alerta">⚠ fora da área</span>' : ''}
         <button class="btn" id="f-pronto">Pronto</button>
       </div>
@@ -288,6 +290,14 @@ export async function telaCampo(el, { id }, ctx) {
       e.target.value = Math.round(s.ponto.rotacao);
       gravar(s);
     };
+    let tPlaq;
+    $('#f-plaqueta', ficha).oninput = (e) => {
+      s.ponto.plaqueta = e.target.value;
+      clearTimeout(tPlaq);
+      tPlaq = setTimeout(() => salvarPonto(s.ponto), 800);
+    };
+    $('#f-plaqueta', ficha).onblur = () => { clearTimeout(tPlaq); salvarPonto(s.ponto); };
+    $('#f-plaqueta', ficha).onkeydown = (e) => { if (e.key === 'Enter') e.target.blur(); };
     let tObs;
     $('#f-obs', ficha).oninput = (e) => {
       s.ponto.observacoes = e.target.value;
@@ -308,7 +318,8 @@ export async function telaCampo(el, { id }, ctx) {
       renderFotos();
     };
     $('#f-excluir', ficha).onclick = async () => {
-      if (!await confirmar(`Excluir o ponto ${numeroDo(s.ponto.id)} e as fotos dele?`, 'Excluir')) return;
+      const nome = s.ponto.plaqueta ? `a plaqueta ${s.ponto.plaqueta}` : `o ponto ${numeroDo(s.ponto.id)}`;
+      if (!await confirmar(`Excluir ${nome} e as fotos dele?`, 'Excluir')) return;
       await excluirPonto(s.ponto);
       s.remover();
       simbolos.delete(s.ponto.id);
@@ -346,6 +357,7 @@ export async function telaCampo(el, { id }, ctx) {
       lng,
       tamanho_m: limitarTamanho(localStorage.getItem('rondaluz-tamanho') || TAMANHO_PADRAO),
       rotacao: 90,
+      plaqueta: '',
       observacoes: '',
       fora_da_area: false,
     };

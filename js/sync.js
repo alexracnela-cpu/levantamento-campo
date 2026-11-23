@@ -33,6 +33,7 @@ export async function salvarPonto(ponto) {
     lng: ponto.lng,
     tamanho_m: ponto.tamanho_m,
     rotacao: ponto.rotacao,
+    plaqueta: (ponto.plaqueta || '').trim(),
     observacoes: ponto.observacoes || '',
     fora_da_area: !!ponto.fora_da_area,
   };

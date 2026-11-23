@@ -234,7 +234,13 @@ body.modo-campo .topo { display: none; }
 .ficha-alca { width: 44px; height: 5px; border-radius: 3px; background: var(--linha); margin: 4px auto 8px; }
 .ficha-topo { display: flex; align-items: center; gap: 8px; }
 .ficha-topo .btn { margin-left: auto; }
-.ficha-titulo { display: flex; align-items: center; gap: 8px; font: 700 1.25rem var(--titulo); color: var(--tinta); }
+.ficha-titulo { display: flex; align-items: center; gap: 8px; font: 700 1.25rem var(--titulo); color: var(--tinta); flex: 1; min-width: 0; }
+.ficha-plaqueta {
+  flex: 1; min-width: 0; padding: 4px 8px; font: 700 1.25rem var(--titulo); color: var(--tinta);
+  background: var(--tinta-clara); border: 1.5px dashed var(--tinta-2); border-radius: 6px; text-transform: uppercase;
+}
+.ficha-plaqueta::placeholder { color: #7d8aa5; text-transform: none; font-weight: 600; }
+.ficha-plaqueta:focus { border-style: solid; background: #fff; }
 .ficha-dica { margin: 6px 0 10px; font-size: .82rem; color: var(--suave); }
 .ficha-numeros { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .passo { display: grid; grid-template-columns: 42px 1fr 42px; }

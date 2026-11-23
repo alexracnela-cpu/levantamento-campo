@@ -120,8 +120,8 @@ async function semear() {
       },
     ],
     pontos: [
-      { id: 'p-1', tarefa_id: t1, lat: em(-70, 11)[0], lng: em(-70, 11)[1], tamanho_m: 2.5, rotacao: 180, observacoes: 'Luminária apagada', fora_da_area: false, criado_por: UID.joao, criado_em: iso(40), atualizado_em: iso(40) },
-      { id: 'p-2', tarefa_id: t1, lat: em(35, -11)[0], lng: em(35, -11)[1], tamanho_m: 2.5, rotacao: 0, observacoes: '', fora_da_area: false, criado_por: UID.joao, criado_em: iso(30), atualizado_em: iso(30) },
+      { id: 'p-1', tarefa_id: t1, lat: em(-70, 11)[0], lng: em(-70, 11)[1], tamanho_m: 2.5, rotacao: 180, plaqueta: 'MN-04521', observacoes: 'Luminária apagada', fora_da_area: false, criado_por: UID.joao, criado_em: iso(40), atualizado_em: iso(40) },
+      { id: 'p-2', tarefa_id: t1, lat: em(35, -11)[0], lng: em(35, -11)[1], tamanho_m: 2.5, rotacao: 0, plaqueta: '', observacoes: '', fora_da_area: false, criado_por: UID.joao, criado_em: iso(30), atualizado_em: iso(30) },
       ...[-260, -200, -150].map((y, i) => ({
         id: `p-q${i}`, tarefa_id: t3, lat: em(211, y)[0], lng: em(211, y)[1], tamanho_m: 2.5, rotacao: 270,
         observacoes: i === 1 ? 'Braço torto' : '', fora_da_area: false, criado_por: UID.carla, criado_em: iso(3000 - i), atualizado_em: iso(3000 - i),

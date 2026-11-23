@@ -41,6 +41,7 @@ create table if not exists public.pontos (
   lng            double precision not null,
   tamanho_m      real not null default 2.5 check (tamanho_m > 0 and tamanho_m <= 200),
   rotacao        real not null default 0,
+  plaqueta       text not null default '',
   observacoes    text not null default '',
   fora_da_area   boolean not null default false,
   criado_por     uuid references public.perfis(id) on delete set null default auth.uid(),
@@ -56,6 +57,9 @@ create table if not exists public.fotos (
   criado_por  uuid default auth.uid(),
   criado_em   timestamptz not null default now()
 );
+
+-- colunas adicionadas depois (para bancos já criados)
+alter table public.pontos add column if not exists plaqueta text not null default '';
 
 create index if not exists pontos_tarefa_idx on public.pontos (tarefa_id);
 create index if not exists fotos_ponto_idx   on public.fotos (ponto_id);
