@@ -2,7 +2,7 @@
 // Contém dados da tarefa, resumo, mapa com pontos numerados e rede, tabela de pontos,
 // rede por trecho e a ficha de cada ponto com as fotos.
 
-import { formasDoBloco, blocoParaMapa } from './simbolo.js';
+import { formasDoBloco, blocoParaMapa, bracosDoPonto, qtdLuminarias } from './simbolo.js';
 import {
   comprimentoM, metragemRede, medidaInformada, formatarMetros, TIPOS, SITUACOES, CORES,
 } from './rede.js';
@@ -116,11 +116,14 @@ export async function mapaEstatico({ area, pontos, redes }, W = 1600, H = 1000) 
     g.lineWidth = 2; g.strokeStyle = AZUL;
     desenharForma(f.quadrado, p, true); g.fillStyle = 'rgba(255,255,255,.8)'; g.fill(); g.stroke();
     desenharForma(f.poste, p, true); g.stroke();
-    [...f.centro, ...f.braco].forEach((l) => { desenharForma(l, p, false); g.stroke(); });
-    g.strokeStyle = VERMELHO;
-    desenharForma(f.luminaria, p, true); g.fillStyle = 'rgba(255,255,255,.8)'; g.fill(); g.stroke();
-    desenharForma(f.vermelho, p, true); g.fillStyle = VERMELHO; g.fill();
-    desenharForma(f.encaixe, p, true); g.fillStyle = '#fff'; g.fill(); g.stroke();
+    const bracos = bracosDoPonto(f, qtdLuminarias(p));
+    [...f.centro, ...bracos.flatMap((b) => b.braco)].forEach((l) => { desenharForma(l, p, false); g.stroke(); });
+    bracos.forEach((b) => {
+      g.strokeStyle = VERMELHO;
+      desenharForma(b.luminaria, p, true); g.fillStyle = 'rgba(255,255,255,.8)'; g.fill(); g.stroke();
+      desenharForma(b.vermelho, p, true); g.fillStyle = VERMELHO; g.fill();
+      desenharForma(b.encaixe, p, true); g.fillStyle = '#fff'; g.fill(); g.stroke();
+    });
     const [x, y] = P(p.lat, p.lng);
     const bx = x - 20; const by = y - 22;
     g.beginPath(); g.moveTo(x, y); g.lineTo(bx, by); g.lineWidth = 2; g.strokeStyle = AZUL; g.stroke();

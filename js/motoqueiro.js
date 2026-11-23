@@ -412,7 +412,7 @@ export async function telaCampo(el, { id }, ctx) {
           <div class="qtd-lum">
             <span>Luminárias</span>
             <div class="passo passo-qtd"><button type="button" data-q="-1" aria-label="Menos uma luminária">−</button>
-            <input id="f-qtd" type="number" inputmode="numeric" min="0" max="20" step="1" value="${p.qtd_luminarias ?? 1}" aria-label="Quantidade de luminárias">
+            <input id="f-qtd" type="number" inputmode="numeric" min="0" max="4" step="1" value="${Math.min(4, p.qtd_luminarias ?? 1)}" aria-label="Quantidade de luminárias">
             <button type="button" data-q="1" aria-label="Mais uma luminária">+</button></div>
           </div>
         </div>
@@ -461,8 +461,9 @@ export async function telaCampo(el, { id }, ctx) {
     };
     const campoQtd = $('#f-qtd', ficha);
     const guardarQtd = (v) => {
-      const n = Math.max(0, Math.min(20, Math.round(Number(v) || 0)));
-      s.ponto.qtd_luminarias = n;
+      const n = Math.max(0, Math.min(4, Math.round(Number(v) || 0))); // no máximo 4 por ponto
+      if (Number(v) > 4) aviso('No máximo 4 luminárias por ponto.');
+      s.atualizar({ qtd_luminarias: n }); // redesenha o símbolo com os braços
       campoQtd.value = n;
       salvarPonto(s.ponto);
     };

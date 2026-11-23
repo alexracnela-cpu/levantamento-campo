@@ -81,6 +81,30 @@ export function formasDoBloco() {
   };
 }
 
+// Quantidade de luminárias do ponto (0 a 4; vazio = 1).
+export const MAX_LUMINARIAS = 4;
+export function qtdLuminarias(p) {
+  const n = Math.round(Number(p?.qtd_luminarias ?? 1));
+  return Number.isFinite(n) ? Math.max(0, Math.min(MAX_LUMINARIAS, n)) : 1;
+}
+
+// Braços com luminária, já girados no sistema do bloco: um por luminária,
+// repartidos por igual (2 = opostos, 3 = a cada 120°, 4 = em cruz). O primeiro segue o rumo.
+export function bracosDoPonto(formas, n) {
+  return Array.from({ length: n }, (_, k) => {
+    const a = (-2 * Math.PI * k) / n; // rumo cresce no sentido horário
+    const c = Math.cos(a);
+    const sn = Math.sin(a);
+    const g = ([x, y]) => [x * c - y * sn, x * sn + y * c];
+    return {
+      braco: formas.braco.map((l) => l.map(g)),
+      luminaria: formas.luminaria.map(g),
+      vermelho: formas.vermelho.map(g),
+      encaixe: formas.encaixe.map(g),
+    };
+  });
+}
+
 // Converte um ponto do bloco (x, y) para [lat, lng].
 export function blocoParaMapa(lat, lng, tamanho, rotacao, [x, y]) {
   const theta = ((90 - rotacao) * Math.PI) / 180; // rumo -> ângulo matemático
@@ -173,10 +197,12 @@ export class SimboloNoMapa {
     this.cQuadrado.setLatLngs(m(f.quadrado));
     this.cPoste.setLatLngs(m(f.poste));
     this.cCentro.setLatLngs(f.centro.map(m));
-    this.cBraco.setLatLngs(f.braco.map(m));
-    this.cLuminaria.setLatLngs(m(f.luminaria));
-    this.cVermelho.setLatLngs(m(f.vermelho));
-    this.cEncaixe.setLatLngs(m(f.encaixe));
+    const bracos = bracosDoPonto(f, qtdLuminarias(this.ponto));
+    this.cBraco.setLatLngs(bracos.flatMap((b) => b.braco.map(m)));
+    // [[anel], [anel]] = um polígono por luminária
+    this.cLuminaria.setLatLngs(bracos.map((b) => [m(b.luminaria)]));
+    this.cVermelho.setLatLngs(bracos.map((b) => [m(b.vermelho)]));
+    this.cEncaixe.setLatLngs(bracos.map((b) => [m(b.encaixe)]));
     const fora = this.ponto.fora_da_area;
     const cor = fora ? '#d97706' : TINTA;
     [this.cQuadrado, this.cPoste, this.cCentro, this.cBraco].forEach((c) => c.setStyle({ color: cor }));
