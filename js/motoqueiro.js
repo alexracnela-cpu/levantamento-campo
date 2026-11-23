@@ -407,7 +407,15 @@ export async function telaCampo(el, { id }, ctx) {
           <button type="button" data-r="15">⟳</button></div></label>
       </div>
       <div class="ficha-poste">
-        <label for="f-poste">Poste <small>altura/esforço · ex.: 11/300</small></label>
+        <div class="poste-topo">
+          <label for="f-poste">Poste <small>altura/esforço · ex.: 11/300</small></label>
+          <div class="qtd-lum">
+            <span>Luminárias</span>
+            <div class="passo passo-qtd"><button type="button" data-q="-1" aria-label="Menos uma luminária">−</button>
+            <input id="f-qtd" type="number" inputmode="numeric" min="0" max="20" step="1" value="${p.qtd_luminarias ?? 1}" aria-label="Quantidade de luminárias">
+            <button type="button" data-q="1" aria-label="Mais uma luminária">+</button></div>
+          </div>
+        </div>
         <div class="poste-linha">
           <input id="f-poste" type="text" inputmode="decimal" maxlength="20" autocomplete="off" placeholder="11/300" value="${esc(p.poste || '')}">
           <button type="button" id="f-barra" aria-label="Inserir barra">/</button>
@@ -451,6 +459,15 @@ export async function telaCampo(el, { id }, ctx) {
       e.target.value = Math.round(s.ponto.rotacao);
       gravar(s);
     };
+    const campoQtd = $('#f-qtd', ficha);
+    const guardarQtd = (v) => {
+      const n = Math.max(0, Math.min(20, Math.round(Number(v) || 0)));
+      s.ponto.qtd_luminarias = n;
+      campoQtd.value = n;
+      salvarPonto(s.ponto);
+    };
+    campoQtd.onchange = () => guardarQtd(campoQtd.value);
+    $$('[data-q]', ficha).forEach((b) => { b.onclick = () => guardarQtd((s.ponto.qtd_luminarias ?? 1) + Number(b.dataset.q)); });
     const campoPoste = $('#f-poste', ficha);
     let tPoste;
     const marcarAtalho = () => $$('[data-poste]', ficha).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.poste === campoPoste.value.trim())));
@@ -613,6 +630,7 @@ export async function telaCampo(el, { id }, ctx) {
       rotacao: 90,
       plaqueta: '',
       poste: '',
+      qtd_luminarias: 1,
       observacoes: '',
       fora_da_area: false,
     };

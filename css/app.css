@@ -559,3 +559,10 @@ body.modo-campo .aviso.mostrar { transform: translate(-50%, 0); }
 .poste-atalhos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .poste-atalhos button { border: 1px solid var(--linha); background: var(--superficie); color: var(--tinta); border-radius: 16px; padding: 5px 11px; font: 600 .85rem var(--corpo); cursor: pointer; }
 .poste-atalhos button[aria-pressed=true] { background: var(--marinho); border-color: var(--marinho); color: #fff; }
+
+/* quantidade de luminárias (ao lado do título Poste) */
+.poste-topo { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; margin-bottom: 5px; }
+.poste-topo > label { margin: 0; }
+.qtd-lum { display: grid; gap: 4px; justify-items: end; font-weight: 600; font-size: .9rem; color: var(--tinta); }
+.passo-qtd { grid-template-columns: 38px 46px 38px; }
+.passo-qtd input { padding: 7px 2px; }

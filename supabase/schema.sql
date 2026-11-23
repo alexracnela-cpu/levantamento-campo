@@ -666,3 +666,7 @@ alter table public.redes add column if not exists comprimento_informado numeric;
 
 -- Poste altura/esforço (também em poste.sql)
 alter table public.pontos add column if not exists poste text not null default '';
+
+-- Quantidade de luminárias (também em luminarias.sql)
+alter table public.pontos add column if not exists qtd_luminarias int not null default 1
+  check (qtd_luminarias between 0 and 20);

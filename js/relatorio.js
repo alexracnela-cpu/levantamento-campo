@@ -214,7 +214,7 @@ export async function montarRelatorio({ tarefa, equipe, pontos, fotos, urls, red
   .info div span { display: block; font-size: 8pt; color: #6b7385; text-transform: uppercase; letter-spacing: .3px; }
   .info div b { font-size: 10pt; color: #1d2433; }
   .obs-final { border-left: 4px solid #2f7d4a; background: #eef7f0; padding: 8px 12px; border-radius: 4px; margin: 8px 0; }
-  .resumo { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0 12px; }
+  .resumo { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 10px 0 12px; }
   .resumo div { border: 1px solid #cddcee; border-radius: 6px; padding: 8px 10px; text-align: center; }
   .resumo b { display: block; font: 700 16pt Arial; color: #003c78; }
   .resumo span { font-size: 8.5pt; color: #6b7385; }
@@ -261,6 +261,7 @@ ${previa ? '<div class="marca-dagua">PRÉVIA</div>' : ''}
   ${tarefa.finalizacao_obs ? `<div class="obs-final"><b>Observação final do motoqueiro:</b> ${esc(tarefa.finalizacao_obs)}</div>` : ''}
   <div class="resumo">
     <div><b>${pontos.length}</b><span>pontos levantados</span></div>
+    <div><b>${pontos.reduce((t, p) => t + (p.qtd_luminarias ?? 1), 0)}</b><span>luminárias</span></div>
     <div class="${semPlaqueta ? 'alerta' : ''}"><b>${semPlaqueta}</b><span>sem plaqueta</span></div>
     <div class="${fora ? 'alerta' : ''}"><b>${fora}</b><span>fora da área</span></div>
     <div><b>${formatarMetros(totalRede)}</b><span>de rede desenhada</span></div>
@@ -276,8 +277,8 @@ ${previa ? '<div class="marca-dagua">PRÉVIA</div>' : ''}
   </div>
 
   <h2>Pontos levantados</h2>
-  ${pontos.length ? `<table><thead><tr><th>Nº</th><th>Plaqueta</th><th>Poste</th><th>Coordenadas (lat, long)</th><th>Tamanho / rumo</th><th>Fotos</th><th>Observações</th></tr></thead><tbody>
-    ${pontos.map((p, i) => `<tr><td><b>${i + 1}</b></td><td>${p.plaqueta ? esc(p.plaqueta) : '<span class="fora">sem plaqueta</span>'}</td><td>${esc(p.poste || '—')}</td>
+  ${pontos.length ? `<table><thead><tr><th>Nº</th><th>Plaqueta</th><th>Poste</th><th>Lum.</th><th>Coordenadas (lat, long)</th><th>Tamanho / rumo</th><th>Fotos</th><th>Observações</th></tr></thead><tbody>
+    ${pontos.map((p, i) => `<tr><td><b>${i + 1}</b></td><td>${p.plaqueta ? esc(p.plaqueta) : '<span class="fora">sem plaqueta</span>'}</td><td>${esc(p.poste || '—')}</td><td>${p.qtd_luminarias ?? 1}</td>
       <td>${coord(p)}${p.fora_da_area ? '<br><span class="fora">fora da área</span>' : ''}</td>
       <td>${String(p.tamanho_m).replace('.', ',')} m · ${Math.round(p.rotacao)}°</td><td>${fotosDo(p.id).length}</td>
       <td>${esc(p.observacoes || '—')}</td></tr>`).join('')}
@@ -294,7 +295,7 @@ ${previa ? '<div class="marca-dagua">PRÉVIA</div>' : ''}
     const fs = fotosDo(p.id);
     return `<div class="ficha ${fs.length > 2 ? 'longa' : ''}">
       <div class="ficha-cab"><i class="num">${i + 1}</i><h3>${nome(p, i)}</h3>${p.fora_da_area ? '<span class="selo previa">fora da área</span>' : ''}</div>
-      <div class="dados">${p.poste ? `Poste: <b>${esc(p.poste)}</b> · ` : ''}Coordenadas: <b>${coord(p)}</b> · Tamanho: <b>${String(p.tamanho_m).replace('.', ',')} m</b> · Rumo: <b>${Math.round(p.rotacao)}°</b> · Registrado em ${horaBR(p.criado_em)}</div>
+      <div class="dados">${p.poste ? `Poste: <b>${esc(p.poste)}</b> · ` : ''}Luminárias: <b>${p.qtd_luminarias ?? 1}</b> · Coordenadas: <b>${coord(p)}</b> · Tamanho: <b>${String(p.tamanho_m).replace('.', ',')} m</b> · Rumo: <b>${Math.round(p.rotacao)}°</b> · Registrado em ${horaBR(p.criado_em)}</div>
       ${p.observacoes ? `<div class="obs">${esc(p.observacoes)}</div>` : '<div class="dados">Sem observações.</div>'}
       ${fs.length ? `<div class="fotos">${fs.map((f, k) => `<figure><img src="${urls[f.path]}" alt="Foto ${k + 1}"><figcaption>Foto ${k + 1} · ${horaBR(f.criado_em)}</figcaption></figure>`).join('')}</div>` : '<p class="sem-fotos">Sem fotos.</p>'}
     </div>`;

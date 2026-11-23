@@ -35,6 +35,7 @@ export async function salvarPonto(ponto) {
     rotacao: ponto.rotacao,
     plaqueta: (ponto.plaqueta || '').trim(),
     poste: (ponto.poste || '').trim(),
+    qtd_luminarias: Number.isFinite(ponto.qtd_luminarias) ? ponto.qtd_luminarias : 1,
     observacoes: ponto.observacoes || '',
     fora_da_area: !!ponto.fora_da_area,
   };
