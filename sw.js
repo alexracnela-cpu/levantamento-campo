@@ -1,7 +1,7 @@
 // Service worker do RondaLuz: app funciona sem internet e guarda os pedaços de mapa já vistos.
 // Ao mudar qualquer arquivo do app, aumente a VERSAO para os celulares baixarem a nova.
 
-const VERSAO = 'v4';
+const VERSAO = 'v5';
 const APP = `rondaluz-app-${VERSAO}`;
 const MAPAS = 'rondaluz-mapas';
 const MAX_PEDACOS = 4000;
@@ -12,6 +12,7 @@ const ARQUIVOS = [
   './css/app.css',
   './manifest.webmanifest',
   './icones/icone-64.png',
+  './icones/icone.svg',
   './icones/icone-192.png',
   './icones/icone-512.png',
   './js/config.js',

@@ -81,7 +81,7 @@ textarea { resize: vertical; }
   background: var(--tinta); color: #fff; box-shadow: 0 2px 0 var(--vermelho);
 }
 .marca { display: flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font: 700 1.35rem var(--titulo); }
-.marca img { width: 34px; height: 34px; }
+.marca img { width: 36px; height: 36px; }
 .nome-marca { font-weight: 700; letter-spacing: .3px; }
 .nome-marca b { color: #4aa3e8; }
 .acesso-marca .nome-marca { color: var(--tinta); }
