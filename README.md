@@ -46,11 +46,11 @@ Envie todos os arquivos desta pasta para o repositório `levantamento-campo`
 
 ## O símbolo
 
-Igual ao bloco do AutoCAD: círculo duplo (o poste), braço e garra, com a metade de cima do círculo interno em vermelho.
+Igual ao bloco do AutoCAD: poste quadrado com círculo e linha de centro, braço de duas linhas paralelas e luminária vermelha com a metade de cima preenchida. O ponto de inserção é o centro do poste.
 
-- **Tamanho** = comprimento do centro do círculo até a ponta da garra, em metros.
+- **Tamanho** = comprimento do centro do poste até a ponta da luminária, em metros (padrão 2,5 m).
 - **Rumo** = para onde o braço aponta: 0° norte, 90° leste (padrão, como o bloco), 180° sul, 270° oeste.
-- No celular: arraste o **círculo tracejado** para mover; arraste a **bolinha vermelha** da ponta para girar e esticar. Os botões − / + e ⟲ / ⟳ da ficha fazem ajuste fino.
+- No celular: arraste o **círculo tracejado** (centro do poste) para mover; arraste a **bolinha vermelha** da ponta para girar e esticar. Os botões − / + e ⟲ / ⟳ da ficha fazem ajuste fino.
 
 As proporções do desenho ficam em `js/simbolo.js` (`PROPORCAO`) se precisar ajustar.
 

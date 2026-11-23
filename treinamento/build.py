@@ -10,7 +10,7 @@ AQUI = Path(__file__).parent
 MODULOS = ['util', 'store', 'api', 'sync', 'simbolo', 'mapa', 'comum', 'lider', 'motoqueiro', 'app']
 
 CRIAR_MAPA_DEMO = '''export function criarMapa(el, { centro = MANAUS, zoom = 17 } = {}) {
-  const mapa = L.map(el, { zoomControl: true, minZoom: 15, maxZoom: 21 }).setView(centro, zoom);
+  const mapa = L.map(el, { zoomControl: true, minZoom: 15, maxZoom: 22 }).setView(centro, zoom);
   mapa.setMaxBounds(L.latLngBounds(em(-700, -700), em(700, 700)));
   desenharCidadeFalsa(mapa);
   L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(mapa);

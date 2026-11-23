@@ -3,7 +3,9 @@
 import { api } from './api.js';
 import { local } from './store.js';
 import { criarMapa, desenharArea, MinhaPosicao } from './mapa.js';
-import { SimboloNoMapa, limitarTamanho, normalizarRumo, svgSimbolo } from './simbolo.js';
+import {
+  SimboloNoMapa, limitarTamanho, normalizarRumo, svgSimbolo, TAMANHO_PADRAO,
+} from './simbolo.js';
 import { abrirModal, confirmar, verOficio, guardarOficio, seloStatus } from './comum.js';
 import {
   salvarPonto, excluirPonto, adicionarFoto, removerFotoLocal, aoMudarFila, estadoFila,
@@ -241,9 +243,9 @@ export async function telaCampo(el, { id }, ctx) {
       <p class="ficha-dica">Arraste o <b>círculo</b> para mover e a <b>ponta</b> para girar e esticar.</p>
       <div class="ficha-numeros">
         <label>Tamanho (m)
-          <div class="passo"><button type="button" data-t="-0.5">−</button>
-          <input id="f-tamanho" type="number" inputmode="decimal" step="0.5" min="0.5" max="200" value="${p.tamanho_m}">
-          <button type="button" data-t="0.5">+</button></div></label>
+          <div class="passo"><button type="button" data-t="-0.1">−</button>
+          <input id="f-tamanho" type="number" inputmode="decimal" step="0.1" min="0.5" max="200" value="${p.tamanho_m}">
+          <button type="button" data-t="0.1">+</button></div></label>
         <label>Rumo (°)
           <div class="passo"><button type="button" data-r="-15">⟲</button>
           <input id="f-rumo" type="number" inputmode="numeric" step="1" value="${Math.round(p.rotacao)}">
@@ -328,7 +330,7 @@ export async function telaCampo(el, { id }, ctx) {
     renderFicha();
     if (s) {
       // garante que o ponto fique visível acima da ficha, perto o bastante para mexer
-      if (mapa.getZoom() < 19) mapa.setView(s.latlng, 19, { animate: false });
+      if (mapa.getZoom() < 22) mapa.setView(s.latlng, 22, { animate: false });
       const alto = mapa.getSize().y;
       const y = mapa.latLngToContainerPoint(s.latlng).y;
       const alvo = alto * 0.25;
@@ -342,7 +344,7 @@ export async function telaCampo(el, { id }, ctx) {
       tarefa_id: id,
       lat,
       lng,
-      tamanho_m: limitarTamanho(localStorage.getItem('rondaluz-tamanho') || 6),
+      tamanho_m: limitarTamanho(localStorage.getItem('rondaluz-tamanho') || TAMANHO_PADRAO),
       rotacao: 90,
       observacoes: '',
       fora_da_area: false,
@@ -362,7 +364,7 @@ export async function telaCampo(el, { id }, ctx) {
     if (!gps.ultima) { aviso('Ainda sem posição do GPS.'); return; }
     if (selecionado) selecionar(null);
     novoPonto(...gps.ultima.latlng);
-    mapa.setView(gps.ultima.latlng, Math.max(mapa.getZoom(), 19));
+    mapa.setView(gps.ultima.latlng, Math.max(mapa.getZoom(), 21));
   };
 
   // quando a fila esvazia, atualiza fotos do servidor (marcadores de pendente somem)

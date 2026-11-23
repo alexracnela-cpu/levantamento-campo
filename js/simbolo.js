@@ -1,48 +1,82 @@
 // Símbolo do levantamento, desenhado em escala real (metros) sobre o mapa.
 //
-// Desenho no sistema do bloco (como no AutoCAD), com o braço apontando para +x:
-//   - círculo duplo centrado no ponto (o poste);
-//   - braço saindo do círculo até 85% do comprimento;
-//   - garra na ponta (travessa + duas pontas);
-//   - metade de cima (+y) do círculo interno pintada de vermelho.
-// "tamanho_m" é o comprimento total, do centro do círculo até a ponta da garra.
+// Cópia do bloco do AutoCAD, com o braço apontando para +x e o ponto de
+// inserção no centro do poste (quadrado). Medidas tiradas do bloco original,
+// em frações do comprimento total (centro do poste até a ponta da luminária = 1):
+//   - poste: quadrado com círculo no centro e linha de centro horizontal;
+//   - braço: duas linhas paralelas saindo do círculo até a luminária;
+//   - luminária: contorno vermelho com encaixe para o braço,
+//     metade de cima (+y) preenchida de vermelho.
+// "tamanho_m" é esse comprimento total, em metros.
 // "rotacao" é o rumo do braço em graus: 0 = norte, 90 = leste (padrão, igual ao bloco).
 
 import { deslocar, emMetros } from './util.js';
 
+export const TAMANHO_PADRAO = 2.5; // metros, do centro do poste até a ponta da luminária
+
 const TINTA = '#1f3a6b';
-const VERMELHO = '#c8281e';
+const VERMELHO = '#e00000';
 
 export const PROPORCAO = {
-  raioExterno: 0.18,
-  raioInterno: 0.11,
-  fimBraco: 0.80,
-  meiaGarra: 0.10,
+  meioQuadrado: 0.177, // metade do lado do quadrado do poste
+  raioPoste: 0.0733, // círculo dentro do quadrado
+  meioBraco: 0.031, // metade da largura do braço
+  // luminária
+  lumEsq: 0.5552, // borda esquerda (reta vertical)
+  lumChanfro: 0.6067, // fim do chanfro em cima/embaixo
+  lumMeioReta: 0.06, // metade da reta vertical da esquerda
+  lumMeiaAltura: 0.128, // metade da altura da luminária
+  lumRetaFim: 0.922, // onde a reta de cima/baixo vira arco
+  lumArcoCentro: 0.856, // centro do arco da frente (raio até x = 1)
+  // encaixe do braço (abertura na luminária)
+  encEsq: 0.5952,
+  encReta: 0.7486,
+  encMeiaAltura: 0.0455,
+  encArcoCentro: 0.7286,
 };
+
+const arco = (cx, cy, r, a0, a1, n = 18) => Array.from({ length: n + 1 }, (_, i) => {
+  const a = a0 + ((a1 - a0) * i) / n;
+  return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+});
 
 // Formas no sistema do bloco, com comprimento total = 1.
 export function formasDoBloco() {
   const P = PROPORCAO;
-  const circulo = (r, n = 48) => Array.from({ length: n }, (_, i) => {
-    const a = (i / n) * Math.PI * 2;
-    return [r * Math.cos(a), r * Math.sin(a)];
-  });
-  const meioCirculoDeCima = (r, n = 24) => {
-    const pts = [];
-    for (let i = 0; i <= n; i++) {
-      const a = (i / n) * Math.PI;
-      pts.push([r * Math.cos(a), r * Math.sin(a)]);
-    }
-    return pts;
-  };
+  const q = P.meioQuadrado;
+  const rLum = 1 - P.lumArcoCentro;
+  const aLum = Math.atan2(P.lumMeiaAltura, P.lumRetaFim - P.lumArcoCentro);
+  const rEnc = Math.hypot(P.encReta - P.encArcoCentro, P.encMeiaAltura);
+  const aEnc = Math.atan2(P.encMeiaAltura, P.encReta - P.encArcoCentro);
+  const xEncFrente = P.encArcoCentro + rEnc;
+
+  const luminaria = [
+    [P.lumEsq, -P.lumMeioReta], [P.lumEsq, P.lumMeioReta],
+    [P.lumChanfro, P.lumMeiaAltura], [P.lumRetaFim, P.lumMeiaAltura],
+    ...arco(P.lumArcoCentro, 0, rLum, aLum, -aLum, 24),
+    [P.lumChanfro, -P.lumMeiaAltura],
+  ];
+  const encaixe = [
+    [P.encEsq, P.encMeiaAltura], [P.encReta, P.encMeiaAltura],
+    ...arco(P.encArcoCentro, 0, rEnc, aEnc, -aEnc, 12),
+    [P.encEsq, -P.encMeiaAltura],
+  ];
+  const metadeVermelha = [
+    [P.lumEsq, 0], [P.lumEsq, P.lumMeioReta], [P.lumChanfro, P.lumMeiaAltura], [P.lumRetaFim, P.lumMeiaAltura],
+    ...arco(P.lumArcoCentro, 0, rLum, aLum, 0, 12),
+    [xEncFrente, 0],
+    ...arco(P.encArcoCentro, 0, rEnc, 0, aEnc, 6),
+    [P.encEsq, P.encMeiaAltura], [P.encEsq, 0],
+  ];
+  const xBraco = Math.sqrt(P.raioPoste ** 2 - P.meioBraco ** 2);
   return {
-    externo: circulo(P.raioExterno),
-    interno: circulo(P.raioInterno),
-    vermelho: meioCirculoDeCima(P.raioInterno),
-    braco: [[P.raioExterno, 0], [P.fimBraco, 0]],
-    garra: [
-      [1, P.meiaGarra], [P.fimBraco, P.meiaGarra], [P.fimBraco, -P.meiaGarra], [1, -P.meiaGarra],
-    ],
+    quadrado: [[-q, -q], [-q, q], [q, q], [q, -q]],
+    poste: arco(0, 0, P.raioPoste, 0, Math.PI * 2, 36),
+    centro: [[[-q, 0], [-P.raioPoste, 0]], [[P.raioPoste, 0], [q, 0]]],
+    braco: [[[xBraco, P.meioBraco], [P.encEsq, P.meioBraco]], [[xBraco, -P.meioBraco], [P.encEsq, -P.meioBraco]]],
+    luminaria,
+    encaixe,
+    vermelho: metadeVermelha,
     ponta: [1, 0],
   };
 }
@@ -74,7 +108,7 @@ export function normalizarRumo(r) {
 }
 
 export function limitarTamanho(t) {
-  return Math.min(200, Math.max(0.5, Math.round((Number(t) || 6) * 10) / 10));
+  return Math.min(200, Math.max(0.5, Math.round((Number(t) || TAMANHO_PADRAO) * 10) / 10));
 }
 
 // ------------------------------------------------------------------
@@ -94,13 +128,14 @@ export class SimboloNoMapa {
     this.formas = formasDoBloco();
 
     const estilo = { color: TINTA, weight: 2, fill: false, interactive: true, bubblingMouseEvents: false };
-    this.cExterno = L.polygon([], { ...estilo, fill: true, fillColor: '#fff', fillOpacity: 0.55 }).addTo(this.grupo);
-    this.cInterno = L.polygon([], { ...estilo }).addTo(this.grupo);
-    this.cVermelho = L.polygon([], {
-      ...estilo, color: VERMELHO, weight: 1, fill: true, fillColor: VERMELHO, fillOpacity: 0.95,
-    }).addTo(this.grupo);
-    this.cBraco = L.polyline([], { ...estilo, weight: 3 }).addTo(this.grupo);
-    this.cGarra = L.polyline([], { ...estilo, weight: 3 }).addTo(this.grupo);
+    const vermelho = { ...estilo, color: VERMELHO, weight: 1.5 };
+    this.cQuadrado = L.polygon([], { ...estilo, weight: 2.5, fill: true, fillColor: '#fff', fillOpacity: 0.6 }).addTo(this.grupo);
+    this.cPoste = L.polygon([], { ...estilo, weight: 1.5 }).addTo(this.grupo);
+    this.cCentro = L.polyline([], { ...estilo, weight: 1 }).addTo(this.grupo);
+    this.cBraco = L.polyline([], { ...estilo, weight: 1.5 }).addTo(this.grupo);
+    this.cLuminaria = L.polygon([], { ...vermelho, fill: true, fillColor: '#fff', fillOpacity: 0.6 }).addTo(this.grupo);
+    this.cVermelho = L.polygon([], { ...vermelho, weight: 0.5, fill: true, fillColor: VERMELHO, fillOpacity: 1 }).addTo(this.grupo);
+    this.cEncaixe = L.polygon([], { ...vermelho, fill: true, fillColor: '#fff', fillOpacity: 0.6 }).addTo(this.grupo);
     // pino que aparece quando o mapa está afastado (o símbolo em escala real fica minúsculo)
     this.pino = L.circleMarker(this.latlng, {
       radius: 7, color: '#fff', weight: 2, fillColor: VERMELHO, fillOpacity: 1, bubblingMouseEvents: false,
@@ -120,7 +155,7 @@ export class SimboloNoMapa {
   }
 
   ajustarPino() {
-    const afastado = this.mapa.getZoom() < 18;
+    const afastado = this.mapa.getZoom() < 20;
     if (afastado && !this.mapa.hasLayer(this.pino)) this.pino.addTo(this.mapa);
     if (!afastado && this.mapa.hasLayer(this.pino)) this.pino.remove();
   }
@@ -135,15 +170,17 @@ export class SimboloNoMapa {
   desenhar() {
     const f = this.formas;
     const m = (lista) => lista.map((xy) => this.pontoMapa(xy));
-    this.cExterno.setLatLngs(m(f.externo));
-    this.cInterno.setLatLngs(m(f.interno));
+    this.cQuadrado.setLatLngs(m(f.quadrado));
+    this.cPoste.setLatLngs(m(f.poste));
+    this.cCentro.setLatLngs(f.centro.map(m));
+    this.cBraco.setLatLngs(f.braco.map(m));
+    this.cLuminaria.setLatLngs(m(f.luminaria));
     this.cVermelho.setLatLngs(m(f.vermelho));
-    this.cBraco.setLatLngs(m(f.braco));
-    this.cGarra.setLatLngs(m(f.garra));
+    this.cEncaixe.setLatLngs(m(f.encaixe));
     const fora = this.ponto.fora_da_area;
     const cor = fora ? '#d97706' : TINTA;
-    [this.cExterno, this.cInterno, this.cBraco, this.cGarra].forEach((c) => c.setStyle({ color: cor }));
-    this.cExterno.setStyle({ weight: this.selecionado ? 3.5 : 2, dashArray: fora ? '4 3' : null });
+    [this.cQuadrado, this.cPoste, this.cCentro, this.cBraco].forEach((c) => c.setStyle({ color: cor }));
+    this.cQuadrado.setStyle({ weight: this.selecionado ? 4 : 2.5, dashArray: fora ? '4 3' : null });
     this.pino.setLatLng(this.latlng);
     this.pino.setStyle({ fillColor: fora ? '#d97706' : VERMELHO, radius: this.selecionado ? 9 : 7 });
     if (this.alcaCentro && !this.arrastandoCentro) this.alcaCentro.setLatLng(this.latlng);
@@ -151,9 +188,9 @@ export class SimboloNoMapa {
   }
 
   criarAlcas() {
-    const icone = (cls) => L.divIcon({ className: `alca ${cls}`, iconSize: [30, 30], iconAnchor: [15, 15] });
-    this.alcaCentro = L.marker(this.latlng, { draggable: true, icon: icone('alca-centro'), zIndexOffset: 1000 });
-    this.alcaPonta = L.marker(this.pontoMapa(this.formas.ponta), { draggable: true, icon: icone('alca-ponta'), zIndexOffset: 1001 });
+    const icone = (cls, t) => L.divIcon({ className: `alca ${cls}`, iconSize: [t, t], iconAnchor: [t / 2, t / 2] });
+    this.alcaCentro = L.marker(this.latlng, { draggable: true, icon: icone('alca-centro', 26), zIndexOffset: 1000 });
+    this.alcaPonta = L.marker(this.pontoMapa(this.formas.ponta), { draggable: true, icon: icone('alca-ponta', 24), zIndexOffset: 1001 });
 
     this.alcaCentro.on('dragstart', () => { this.arrastandoCentro = true; });
     this.alcaCentro.on('drag', (e) => {
@@ -204,12 +241,15 @@ export class SimboloNoMapa {
 // Ícone SVG do símbolo (para listas e para o app).
 export function svgSimbolo(px = 40) {
   const f = formasDoBloco();
-  const s = (lista) => lista.map(([x, y]) => `${(x * 100).toFixed(1)},${(-y * 100).toFixed(1)}`).join(' ');
-  return `<svg viewBox="-22 -22 126 44" width="${px * 2.8}" height="${px}" aria-hidden="true">
-    <polygon points="${s(f.externo)}" fill="#fff" stroke="${TINTA}" stroke-width="2.4"/>
-    <polygon points="${s(f.interno)}" fill="none" stroke="${TINTA}" stroke-width="2"/>
+  const p = ([x, y]) => `${(x * 100).toFixed(1)},${(-y * 100).toFixed(1)}`;
+  const s = (lista) => lista.map(p).join(' ');
+  const linhas = (pares) => pares.map((l) => `<polyline points="${s(l)}"/>`).join('');
+  return `<svg viewBox="-20 -20 122 40" width="${px * 3}" height="${px}" aria-hidden="true">
+    <polygon points="${s(f.quadrado)}" fill="#fff" stroke="${TINTA}" stroke-width="2.2"/>
+    <polygon points="${s(f.poste)}" fill="none" stroke="${TINTA}" stroke-width="1.4"/>
+    <g fill="none" stroke="${TINTA}" stroke-width="1.2">${linhas(f.centro)}${linhas(f.braco)}</g>
+    <polygon points="${s(f.luminaria)}" fill="#fff" stroke="${VERMELHO}" stroke-width="1.4"/>
     <polygon points="${s(f.vermelho)}" fill="${VERMELHO}"/>
-    <polyline points="${s(f.braco)}" fill="none" stroke="${TINTA}" stroke-width="3"/>
-    <polyline points="${s(f.garra)}" fill="none" stroke="${TINTA}" stroke-width="3"/>
+    <polygon points="${s(f.encaixe)}" fill="#fff" stroke="${VERMELHO}" stroke-width="1.2"/>
   </svg>`;
 }

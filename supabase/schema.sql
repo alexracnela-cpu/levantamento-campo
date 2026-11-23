@@ -39,7 +39,7 @@ create table if not exists public.pontos (
   tarefa_id      uuid not null references public.tarefas(id) on delete cascade,
   lat            double precision not null,
   lng            double precision not null,
-  tamanho_m      real not null default 6 check (tamanho_m > 0 and tamanho_m <= 200),
+  tamanho_m      real not null default 2.5 check (tamanho_m > 0 and tamanho_m <= 200),
   rotacao        real not null default 0,
   observacoes    text not null default '',
   fora_da_area   boolean not null default false,
