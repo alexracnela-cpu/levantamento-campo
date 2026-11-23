@@ -1,7 +1,7 @@
 // Service worker do RondaLuz: app funciona sem internet e guarda os pedaços de mapa já vistos.
 // Ao mudar qualquer arquivo do app, aumente a VERSAO para os celulares baixarem a nova.
 
-const VERSAO = 'v25';
+const VERSAO = 'v26';
 const APP = `rondaluz-app-${VERSAO}`;
 const MAPAS = 'rondaluz-mapas';
 const MAX_PEDACOS = 4000;
@@ -47,7 +47,8 @@ const ehExternoFixo = (url) => /unpkg\.com|cdn\.jsdelivr\.net|fonts\.(googleapis
 self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
     const c = await caches.open(APP);
-    await c.addAll(ARQUIVOS);
+    // cache: 'reload' = baixa do servidor, sem usar o cache do navegador (o GitHub Pages guarda por 10 min)
+    await c.addAll(ARQUIVOS.map((u) => new Request(u, { cache: 'reload' })));
     await Promise.all(EXTERNOS.map((u) => c.add(new Request(u, { mode: 'cors' })).catch(() => {})));
     self.skipWaiting();
   })());
@@ -89,7 +90,9 @@ async function pedacoDeMapa(req) {
 async function primeiroRede(req) {
   const c = await caches.open(APP);
   try {
-    const resp = await fetch(req);
+    // no-cache: sempre confere com o servidor, para a versão nova aparecer na hora
+    // (pedido de navegação não aceita opções: refaz pelo endereço)
+    const resp = await fetch(req.mode === 'navigate' ? req.url : req, { cache: 'no-cache' });
     if (resp.ok) c.put(req, resp.clone());
     return resp;
   } catch {
