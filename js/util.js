@@ -111,6 +111,8 @@ export function mensagemErro(e) {
   if (/Invalid login credentials/i.test(m)) return 'E-mail ou senha incorretos.';
   if (/already registered|already exists/i.test(m)) return 'Este e-mail já tem conta. Use "Entrar".';
   if (/RONDALUZ_SEM_CONVITE|Database error saving new user/i.test(m)) return 'Este e-mail não foi convidado. Peça ao líder para te convidar na tela Equipe.';
+  if (/Email logins are disabled|Email signups are disabled/i.test(m)) return 'Login por e-mail desligado no Supabase (Authentication > Sign In / Providers > Email).';
+  if (/Signups not allowed/i.test(m)) return 'Cadastro desligado no Supabase (Authentication > Sign In / Providers > Allow new users to sign up).';
   if (/Password should be at least/i.test(m)) return 'A senha precisa ter pelo menos 6 caracteres.';
   if (/Email not confirmed/i.test(m)) return 'E-mail não confirmado. No Supabase, desligue "Confirm email".';
   if (/Failed to fetch|NetworkError|network/i.test(m)) return 'Sem conexão com o servidor.';
