@@ -453,15 +453,27 @@ export async function telaTarefaLider(el, { id }, ctx) {
 export async function telaEquipe(el, _p, ctx) {
   el.innerHTML = `<section class="pagina">
     <div class="cabecalho-pagina"><h1>Equipe</h1></div>
-    <p class="dica">Só entra quem você convidar. A pessoa cria a conta no site usando exatamente o e-mail convidado.</p>
-    <form id="f-convite" class="cartao-convite">
-      <h3>Convidar pessoa</h3>
-      <div class="linha-convite">
-        <input name="email" type="email" required placeholder="email@exemplo.com" autocomplete="off">
-        <select name="papel"><option value="motoqueiro">Motoqueiro</option><option value="lider">Líder</option></select>
-        <button class="btn primario">Convidar</button>
-      </div>
-    </form>
+    <p class="dica">Só entra quem você cadastrar. Motoqueiros entram com <b>RE + PIN</b>; líderes, com e-mail e senha.</p>
+    <div class="grade-cadastro">
+      <form id="f-moto" class="cartao-convite">
+        <h3>🏍 Cadastrar motoqueiro</h3>
+        <div class="linha-convite">
+          <input name="nome" required placeholder="Nome completo" autocomplete="off">
+          <input name="re" required inputmode="numeric" pattern="[0-9]{3}" maxlength="3" placeholder="RE (3 números)" autocomplete="off">
+          <button class="btn primario">Cadastrar</button>
+        </div>
+        <p class="dica">No primeiro acesso ele digita o RE, confirma o nome e cria o próprio PIN.</p>
+      </form>
+      <form id="f-convite" class="cartao-convite">
+        <h3>💼 Convidar líder</h3>
+        <div class="linha-convite">
+          <input name="email" type="email" required placeholder="email@exemplo.com" autocomplete="off">
+          <button class="btn primario">Convidar</button>
+        </div>
+        <p class="dica">A pessoa cria a conta em "Líder → Criar conta" usando esse e-mail.</p>
+        <input type="hidden" name="papel" value="lider">
+      </form>
+    </div>
     <div id="convites"></div>
     <h3 class="titulo-secao">Membros</h3>
     <div id="equipe" class="lista-equipe"><p class="vazio">Carregando…</p></div>
@@ -475,7 +487,7 @@ export async function telaEquipe(el, _p, ctx) {
       const [eq, cv] = await Promise.all([api.equipe(), api.convites()]);
       $('#convites', el).innerHTML = cv.length ? `<h3 class="titulo-secao">Convites aguardando cadastro</h3>
         <div class="lista-equipe">${cv.map((c) => `<div class="membro">
-          <div><b>${esc(c.email)}</b><br><span class="email">convidado em ${horaBR(c.criado_em)}</span></div>
+          <div><b>${esc(c.re ? `${c.nome || '—'} · RE ${c.re}` : c.email)}</b><br><span class="email">${c.re ? 'ainda não fez o primeiro acesso' : 'convidado'} · ${horaBR(c.criado_em)}</span></div>
           <span class="selo ${CLASSE[c.papel]}">${NOMES[c.papel]}</span>
           <button class="btn" data-cancelar="${esc(c.email)}">Cancelar convite</button></div>`).join('')}</div>` : '';
 
@@ -487,11 +499,12 @@ export async function telaEquipe(el, _p, ctx) {
           else {
             botoes = `<button class="btn" data-id="${m.id}" data-papel="${m.papel === 'lider' ? 'motoqueiro' : 'lider'}">
               ${m.papel === 'lider' ? 'Tornar motoqueiro' : 'Promover a líder'}</button>
+              ${m.re ? `<button class="btn" data-zerar="${m.id}" data-nome="${esc(m.nome)}">Zerar PIN</button>` : ''}
               <button class="btn perigo" data-id="${m.id}" data-papel="bloqueado" data-nome="${esc(m.nome || m.email)}">Remover acesso</button>`;
           }
         }
         return `<div class="membro ${m.papel === 'bloqueado' ? 'apagado' : ''}">
-          <div><b>${esc(m.nome || '—')}</b>${eu ? ' <span class="voce">(você)</span>' : ''}<br><span class="email">${esc(m.email)}</span></div>
+          <div><b>${esc(m.nome || '—')}</b>${eu ? ' <span class="voce">(você)</span>' : ''}<br><span class="email">${m.re ? `RE ${esc(m.re)} · entra com PIN` : esc(m.email)}</span></div>
           <span class="selo ${CLASSE[m.papel]}">${NOMES[m.papel]}</span>
           <div class="botoes-membro">${botoes}</div>
         </div>`;
@@ -509,6 +522,12 @@ export async function telaEquipe(el, _p, ctx) {
           } catch (e) { aviso(mensagemErro(e), 'erro'); b.disabled = false; }
         };
       });
+      $$('button[data-zerar]', el).forEach((b) => {
+        b.onclick = async () => {
+          if (!await confirmar(`Zerar o PIN de ${b.dataset.nome}? No próximo acesso ele cria um PIN novo.`, 'Zerar PIN')) return;
+          try { await api.zerarPin(b.dataset.zerar); aviso('PIN zerado. Avise a pessoa para criar outro.', 'ok'); } catch (e) { aviso(mensagemErro(e), 'erro'); }
+        };
+      });
       $$('button[data-cancelar]', el).forEach((b) => {
         b.onclick = async () => {
           try { await api.cancelarConvite(b.dataset.cancelar); aviso('Convite cancelado.', 'ok'); carregar(); } catch (e) { aviso(mensagemErro(e), 'erro'); }
@@ -517,6 +536,19 @@ export async function telaEquipe(el, _p, ctx) {
     } catch (e) {
       $('#equipe', el).innerHTML = `<p class="vazio">${esc(mensagemErro(e))}</p>`;
     }
+  };
+
+  $('#f-moto', el).onsubmit = async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const re = String(f.get('re')).trim();
+    if (!/^[0-9]{3}$/.test(re)) { aviso('O RE precisa ter 3 números. Ex.: 010', 'erro'); return; }
+    try {
+      await api.cadastrarMotoqueiro(String(f.get('nome')), re);
+      e.target.reset();
+      aviso(`Cadastrado. Avise para entrar em ${location.host} com o RE ${re} e criar o PIN.`, 'ok');
+      carregar();
+    } catch (err) { aviso(mensagemErro(err), 'erro'); }
   };
 
   $('#f-convite', el).onsubmit = async (e) => {

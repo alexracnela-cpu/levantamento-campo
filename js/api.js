@@ -26,6 +26,24 @@ export const api = {
   }).then(ok),
   sair: () => sb.auth.signOut(),
 
+  // ---- motoqueiro: RE + PIN
+  consultarRe: (re) => sb.rpc('consultar_re', { p_re: re }).then(ok),
+  async entrarRe(re, pin) {
+    const r = ok(await sb.rpc('entrar_re', { p_re: re, p_pin: pin }));
+    return ok(await sb.auth.signInWithPassword({ email: r.email, password: r.segredo }));
+  },
+  async criarPinEEntrar(re, pin) {
+    const r = ok(await sb.rpc('criar_pin', { p_re: re, p_pin: pin }));
+    if (r.nova_conta) {
+      return ok(await sb.auth.signUp({ email: r.email, password: r.segredo, options: { data: { nome: r.nome } } }));
+    }
+    return ok(await sb.auth.signInWithPassword({ email: r.email, password: r.segredo }));
+  },
+  zerarPin: (perfilId) => sb.rpc('zerar_pin', { p_perfil: perfilId }).then(ok),
+  cadastrarMotoqueiro: (nome, re) => sb.from('convites').upsert({
+    email: `re${re}@motoqueiro.rondaluz.app`, papel: 'motoqueiro', nome: nome.trim(), re, usado_em: null,
+  }, { onConflict: 'email' }).then(ok),
+
   // ---- perfis
   meuPerfil: (id) => sb.from('perfis').select('*').eq('id', id).maybeSingle().then(ok),
   equipe: () => sb.from('perfis').select('*').order('nome').then(ok),

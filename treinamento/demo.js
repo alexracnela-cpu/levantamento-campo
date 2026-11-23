@@ -96,10 +96,14 @@ async function semear() {
   DB.dados = {
     perfis: [
       { id: UID.lider, nome: 'Alex (líder)', email: 'alex@exemplo.com', papel: 'lider', criado_em: iso(9000) },
-      { id: UID.joao, nome: 'João Motoqueiro', email: 'joao@exemplo.com', papel: 'motoqueiro', criado_em: iso(8000) },
-      { id: UID.carla, nome: 'Carla Souza', email: 'carla@exemplo.com', papel: 'motoqueiro', criado_em: iso(7000) },
+      { id: UID.joao, nome: 'João Motoqueiro', email: 're010@motoqueiro.rondaluz.app', re: '010', papel: 'motoqueiro', criado_em: iso(8000) },
+      { id: UID.carla, nome: 'Carla Souza', email: 're011@motoqueiro.rondaluz.app', re: '011', papel: 'motoqueiro', criado_em: iso(7000) },
     ],
-    convites: [{ email: 'pedro@exemplo.com', papel: 'motoqueiro', convidado_por: UID.lider, criado_em: iso(90), usado_em: null }],
+    convites: [{ email: 're012@motoqueiro.rondaluz.app', re: '012', nome: 'Pedro Lima', papel: 'motoqueiro', convidado_por: UID.lider, criado_em: iso(90), usado_em: null }],
+    credenciais: {
+      '010': { pin: '4821', segredo: 'segredo-joao', tentativas: 0, bloqueadoAte: 0, zerado: false },
+      '011': { pin: '7392', segredo: 'segredo-carla', tentativas: 0, bloqueadoAte: 0, zerado: false },
+    },
     tarefas: [
       {
         id: t1, titulo: 'Av. do Centro — trecho principal',
@@ -271,9 +275,58 @@ function criarSb(inst) {
 
   const sessao = () => ({ user: { id: inst.uid, email: DB.dados.perfis.find((p) => p.id === inst.uid)?.email } });
 
+  const erro = (message) => ({ data: null, error: { message } });
+  const pinFraco = (p) => !/^[0-9]{4}$/.test(p) || /^(.)\1{3}$/.test(p) || '01234567890'.includes(p) || '09876543210'.includes(p)
+    || ['1212', '2121', '1122', '2580', '0852', '1010', '6969', '1313', '2020', '2323'].includes(p);
+  function consultarRe(re) {
+    const d = DB.dados;
+    const p = d.perfis.find((x) => x.re === re);
+    if (p) {
+      if (p.papel === 'bloqueado') return { estado: 'sem_acesso' };
+      const c = d.credenciais[re];
+      if (!c || c.zerado || !c.pin) return { estado: 'criar_pin', nome: p.nome };
+      return { estado: 'ativo', nome: p.nome.split(' ')[0] };
+    }
+    const cv = d.convites.find((x) => x.re === re && !x.usado_em);
+    return cv ? { estado: 'criar_pin', nome: cv.nome, novo: true } : { estado: 'inexistente' };
+  }
+
   async function rpc(nome, args) {
     await espera(120);
     if (!inst.online) return semRede;
+    const d = DB.dados;
+    if (nome === 'consultar_re') return { data: consultarRe(args.p_re), error: null };
+    if (nome === 'criar_pin') {
+      const info = consultarRe(args.p_re);
+      if (info.estado !== 'criar_pin') return erro('Este RE já tem PIN. Use "Entrar" ou peça ao líder para zerar.');
+      if (pinFraco(args.p_pin)) return erro('Esse PIN é fácil de adivinhar. Escolha outro.');
+      const segredo = crypto.randomUUID();
+      d.credenciais[args.p_re] = { pin: args.p_pin, segredo, tentativas: 0, bloqueadoAte: 0, zerado: false };
+      const p = d.perfis.find((x) => x.re === args.p_re);
+      if (p) return { data: { email: p.email, segredo, nova_conta: false }, error: null };
+      return { data: { email: `re${args.p_re}@motoqueiro.rondaluz.app`, segredo, nova_conta: true, nome: info.nome }, error: null };
+    }
+    if (nome === 'entrar_re') {
+      const c = d.credenciais[args.p_re];
+      const p = d.perfis.find((x) => x.re === args.p_re);
+      if (!c || !p || !c.pin || c.zerado) return erro('RE ou PIN incorretos.');
+      if (p.papel === 'bloqueado') return erro('Seu acesso foi removido. Fale com o líder.');
+      if (c.bloqueadoAte > Date.now()) return erro(`Muitas tentativas erradas. Tente de novo em ${Math.ceil((c.bloqueadoAte - Date.now()) / 60000)} minuto(s) ou peça ao líder para zerar o PIN.`);
+      if (c.pin !== args.p_pin) {
+        c.tentativas += 1;
+        if (c.tentativas >= 5) { c.bloqueadoAte = Date.now() + 15 * 60000; return erro('PIN errado 5 vezes. RE bloqueado por 15 minutos.'); }
+        return erro(`PIN incorreto. Restam ${5 - c.tentativas} tentativa(s).`);
+      }
+      c.tentativas = 0; c.bloqueadoAte = 0;
+      return { data: { email: p.email, segredo: c.segredo }, error: null };
+    }
+    if (nome === 'zerar_pin') {
+      if (papel() !== 'lider') return erro('Só o líder pode zerar PIN.');
+      const p = d.perfis.find((x) => x.id === args.p_perfil);
+      if (!p?.re) return erro('Esta pessoa não entra por RE.');
+      d.credenciais[p.re] = { pin: null, segredo: crypto.randomUUID(), tentativas: 0, bloqueadoAte: 0, zerado: true };
+      return { data: null, error: null };
+    }
     const t = DB.dados.tarefas.find((x) => x.id === args.t);
     if (!t) return { data: null, error: { message: 'Tarefa não encontrada' } };
     if (nome === 'finalizar_tarefa') {
@@ -337,14 +390,29 @@ function criarSb(inst) {
         return { data: { subscription: { unsubscribe() {} } } };
       },
       async signOut() { inst.logado = false; inst.cbAuth?.('SIGNED_OUT', null); return { error: null }; },
-      async signInWithPassword() {
+      async signInWithPassword({ email, password }) {
         await espera(200);
+        const p = DB.dados.perfis.find((x) => x.email === String(email).toLowerCase());
+        if (!p) return { data: null, error: { message: 'Invalid login credentials' } };
+        if (p.re && DB.dados.credenciais[p.re]?.segredo !== password) return { data: null, error: { message: 'Invalid login credentials' } };
+        inst.uid = p.id;
         inst.logado = true;
         setTimeout(() => inst.cbAuth?.('SIGNED_IN', sessao()), 0);
         return { data: { session: sessao() }, error: null };
       },
-      async signUp() {
-        return { data: null, error: { message: 'Na demonstração não dá para criar conta. Use "Entrar" com qualquer senha.' } };
+      async signUp({ email, options }) {
+        await espera(200);
+        const e = String(email).toLowerCase();
+        const cv = DB.dados.convites.find((x) => x.email === e && !x.usado_em);
+        if (!cv) return { data: null, error: { message: 'RONDALUZ_SEM_CONVITE' } };
+        cv.usado_em = new Date().toISOString();
+        const p = { id: crypto.randomUUID(), nome: cv.nome || options?.data?.nome || e.split('@')[0], email: e, re: cv.re || null, papel: cv.papel, criado_em: new Date().toISOString() };
+        DB.dados.perfis.push(p);
+        notificar('perfis', 'INSERT', p);
+        inst.uid = p.id;
+        inst.logado = true;
+        setTimeout(() => inst.cbAuth?.('SIGNED_IN', sessao()), 0);
+        return { data: { session: sessao() }, error: null };
       },
     },
     channel(nome) {
