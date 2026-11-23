@@ -47,6 +47,7 @@
     estado.moto = { uid: UID.joao, online: true, logado: true };
     criarApp($('#app-pc'), estado.lider);
     criarApp($('#app-cel'), estado.moto);
+    window.__treino = estado;
     desenharSinal();
     $('#carregando').hidden = true;
   }

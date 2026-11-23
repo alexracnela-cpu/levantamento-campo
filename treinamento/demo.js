@@ -401,6 +401,35 @@ function desenharCidadeFalsa(mapa) {
   rotulo(em(0, 330), 'Praça', false);
 }
 
+// Mesmo mapa ilustrativo, desenhado no canvas do relatório.
+function desenharFundoRelatorio(g, P, W, H) {
+  g.fillStyle = '#efe7d4';
+  g.fillRect(0, 0, W, H);
+  const ret = (x0, y0, x1, y1, cor) => {
+    const pts = retangulo(x0, y0, x1, y1).map(([la, ln]) => P(la, ln));
+    g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath();
+    g.fillStyle = cor; g.fill();
+  };
+  const xs = [-EXT, ...RUAS_NS.map((r) => r[0]), EXT];
+  const ys = [-EXT, ...RUAS_LO.map((r) => r[0]), EXT];
+  for (let i = 0; i < xs.length - 1; i++) {
+    for (let j = 0; j < ys.length - 1; j++) {
+      const praca = xs[i] === 0 && ys[j] === 220;
+      ret(xs[i] + MEIA_RUA + 4, ys[j] + MEIA_RUA + 4, xs[i + 1] - MEIA_RUA - 4, ys[j + 1] - MEIA_RUA - 4, praca ? '#cfe3bf' : '#e3d9c1');
+    }
+  }
+  RUAS_LO.forEach(([y]) => ret(-EXT, y - MEIA_RUA, EXT, y + MEIA_RUA, '#fbf8f1'));
+  RUAS_NS.forEach(([x]) => ret(x - MEIA_RUA, -EXT, x + MEIA_RUA, EXT, '#fbf8f1'));
+  g.font = 'bold 15px Arial'; g.fillStyle = '#8d8168'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  RUAS_LO.forEach(([y, n]) => { [-315, 105].forEach((x) => { const [a, b] = P(...em(x, y)); if (a > 0 && a < W && b > 0 && b < H) g.fillText(n.toUpperCase(), a, b); }); });
+  RUAS_NS.forEach(([x, n]) => {
+    [-110, 110].forEach((y) => {
+      const [a, b] = P(...em(x, y));
+      if (a > 0 && a < W && b > 0 && b < H) { g.save(); g.translate(a, b); g.rotate(-Math.PI / 2); g.fillText(n.toUpperCase(), 0, 0); g.restore(); }
+    });
+  });
+}
+
 // GPS simulado: anda pela Av. do Centro, entrando e saindo da área.
 function criarGeo(inst) {
   return {
@@ -455,6 +484,7 @@ function criarApp(raiz, inst) {
     addEventListener(ev, fn) { (eventos[ev] ||= []).push(fn); },
     removeEventListener() {},
     scrollTo() { raiz.scrollTop = 0; },
+    open: () => null, // o visualizador não abre abas: o relatório aparece numa janela dentro da página
     confirm: () => true,
     RONDALUZ_CONFIG: { SUPABASE_URL: 'https://demonstracao.supabase.co', SUPABASE_ANON_KEY: 'modo-treinamento-sem-banco-real' },
     supabase: { createClient: () => criarSb(inst) },
@@ -485,6 +515,8 @@ function criarApp(raiz, inst) {
   }, true);
 
   /*MODULOS*/
+  M.relatorio.opcoesRelatorio.desenharFundo = desenharFundoRelatorio;
+  inst.M = M;
 }
 
 function destruirApp(inst, raiz) {

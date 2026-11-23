@@ -3,6 +3,7 @@
 import { api } from './api.js';
 import { criarMapa, desenharArea, DesenhoDeArea } from './mapa.js';
 import { SimboloNoMapa } from './simbolo.js';
+import { montarRelatorio } from './relatorio.js';
 import {
   RedeNoMapa, TIPOS, SITUACOES, svgLinha, legendaRede, comprimentoM, formatarMetros,
 } from './rede.js';
@@ -247,6 +248,7 @@ export async function telaTarefaLider(el, { id }, ctx) {
       <div class="linha-botoes">
         <button class="btn" id="b-oficio" ${tarefa.oficio_path ? '' : 'disabled'}>📄 Ver ofício</button>
         <button class="btn" id="b-enquadrar">Ver área inteira</button>
+        <button class="btn primario" id="b-relatorio">📄 Relatório PDF</button>
       </div>
       <h3 class="titulo-secao">Rede desenhada</h3>
       <div id="redes" class="resumo-redes"></div>
@@ -398,6 +400,35 @@ export async function telaTarefaLider(el, { id }, ctx) {
       idsConhecidos = new Set(pontos.map((p) => p.id));
       render();
     } catch (e) { aviso(mensagemErro(e), 'erro'); }
+  };
+
+  $('#b-relatorio', el).onclick = async () => {
+    const b = $('#b-relatorio', el);
+    b.disabled = true;
+    b.textContent = 'Gerando…';
+    // a aba precisa abrir no clique (senão o navegador bloqueia)
+    const janela = typeof window.open === 'function' ? window.open('', '_blank') : null;
+    if (janela) janela.document.write('<p style="font:16px Arial;padding:24px;color:#003c78">Gerando o relatório…</p>');
+    try {
+      const novas = fotos.length ? await api.urlsFotos(fotos.map((f) => f.path)) : {};
+      const html = await montarRelatorio({ tarefa, equipe, pontos, fotos, urls: { ...urls, ...novas }, redes });
+      if (janela && !janela.closed) {
+        janela.document.open();
+        janela.document.write(html);
+        janela.document.close();
+      } else {
+        const { caixa } = abrirModal(`<h3>Relatório do levantamento</h3>
+          <p class="dica">Use o botão "Imprimir / Salvar PDF" dentro do relatório.</p>
+          <iframe class="relatorio-previa" title="Relatório"></iframe>`, { largo: true });
+        caixa.querySelector('iframe').srcdoc = html.replace("location.hash.includes('sem-imprimir')", 'true');
+      }
+    } catch (e) {
+      if (janela) janela.close();
+      aviso(`Não consegui gerar o relatório: ${mensagemErro(e)}`, 'erro');
+    } finally {
+      b.disabled = false;
+      b.textContent = '📄 Relatório PDF';
+    }
   };
 
   await carregar();
