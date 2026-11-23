@@ -1,5 +1,5 @@
 // Relatório do levantamento: página A4 pronta para imprimir ou "Salvar como PDF".
-// Contém dados da tarefa, resumo, mapa com pontos numerados e rede, tabela de pontos,
+// Contém dados da demanda, resumo, mapa com pontos numerados e rede, tabela de pontos,
 // rede por trecho e a ficha de cada ponto com as fotos.
 
 import { formasDoBloco, blocoParaMapa, bracosDoPonto, qtdLuminarias } from './simbolo.js';

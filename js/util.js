@@ -121,7 +121,7 @@ export function mensagemErro(e) {
   return m;
 }
 
-// Há quantos dias a tarefa está com a pessoa (para quando ela tocou em Terminei).
+// Há quantos dias a demanda está com a pessoa (para quando ela tocou em Terminei).
 export function diasComPessoa(t) {
   if (!t?.motoqueiro_id) return null;
   const inicio = new Date(t.atribuida_em || t.criado_em);

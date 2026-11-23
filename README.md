@@ -3,7 +3,7 @@
 App web que abre no PC e no celular (instalável como app).
 
 - **Líder (PC):** desenha a área no mapa, anexa o ofício, define título, descrição, prazo e motoqueiro, acompanha os pontos chegando ao vivo, muda o status e promove membros a líder na tela **Equipe**.
-- **Motoqueiro (celular):** vê as tarefas dele, abre o ofício, vê a área e a própria posição pelo GPS, toca no mapa para pôr o símbolo do levantamento, arrasta, gira e muda o tamanho (em metros, escala real), preenche a ficha com observações e fotos. O app avisa quando o ponto fica fora da área.
+- **Motoqueiro (celular):** vê as demandas dele, abre o ofício, vê a área e a própria posição pelo GPS, toca no mapa para pôr o símbolo do levantamento, arrasta, gira e muda o tamanho (em metros, escala real), preenche a ficha com observações e fotos. O app avisa quando o ponto fica fora da área.
 - **Sem sinal:** pontos e fotos ficam guardados no celular e sobem sozinhos quando a internet volta. Os pedaços de mapa já vistos também ficam guardados.
 
 Tudo em HTML, CSS e JavaScript, sem etapa de build. Mapa com Leaflet (OpenStreetMap e satélite Esri). Dados, login e arquivos no Supabase.
@@ -61,8 +61,8 @@ index.html              página única
 css/app.css             visual "prancheta de campo"
 js/config.js            URL e chave do Supabase  ← preencher
 js/app.js               acesso, rotas e barra do topo
-js/lider.js             painel, nova tarefa, acompanhamento ao vivo, equipe
-js/motoqueiro.js        minhas tarefas e mapa de campo
+js/lider.js             painel, nova demanda, acompanhamento ao vivo, equipe
+js/motoqueiro.js        minhas demandas e mapa de campo
 js/simbolo.js           desenho do símbolo em escala real
 js/mapa.js              mapa, desenho da área, GPS
 js/sync.js              fila de envio offline

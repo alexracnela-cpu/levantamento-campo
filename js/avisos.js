@@ -89,7 +89,7 @@ export async function iniciarAvisos(ctx) {
     if (novas.length === 1) {
       avisar({ icone: '📋', titulo: 'Novo levantamento para você', texto: `${novas[0].titulo}${novas[0].prazo ? ` · prazo ${dataBR(novas[0].prazo)}` : ''}`, href: `#/campo/${novas[0].id}` });
     } else if (novas.length > 1) {
-      avisar({ icone: '📋', titulo: `${novas.length} levantamentos novos para você`, texto: 'Veja em Minhas tarefas.', href: '#/minhas', botao: 'Ver' });
+      avisar({ icone: '📋', titulo: `${novas.length} levantamentos novos para você`, texto: 'Veja em Minhas demandas.', href: '#/minhas', botao: 'Ver' });
     }
     minhas.forEach((t) => jaVistas.add(t.id));
     guardarVistas(eu.id, jaVistas);

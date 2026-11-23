@@ -1,4 +1,4 @@
-// Telas do motoqueiro: lista de tarefas e o mapa de campo com o símbolo.
+// Telas do motoqueiro: lista de demandas e o mapa de campo com o símbolo.
 
 import { api } from './api.js';
 import { local } from './store.js';
@@ -19,11 +19,11 @@ import {
 } from './util.js';
 
 // ------------------------------------------------------------------
-// Minhas tarefas
+// Minhas demandas
 // ------------------------------------------------------------------
 export async function telaMinhas(el, _p, ctx) {
   el.innerHTML = `<section class="pagina">
-    <div class="cabecalho-pagina"><h1>Minhas tarefas</h1></div>
+    <div class="cabecalho-pagina"><h1>Minhas demandas</h1></div>
     <div id="lista" class="lista-tarefas"><p class="vazio">Carregando…</p></div>
   </section>`;
 
@@ -39,7 +39,7 @@ export async function telaMinhas(el, _p, ctx) {
         ${t.descricao ? `<p class="ct-desc">${esc(t.descricao)}</p>` : ''}
         <p class="ct-meta ${prazoVencido(t.prazo, t.status) ? 'vencido' : ''}">Prazo: ${dataBR(t.prazo)}${t.oficio_path ? ' · 📄 ofício' : ''}</p>
         ${(() => { const d = diasComPessoa(t); return d ? `<p class="ct-meta">📅 Com você ${d.texto}</p>` : ''; })()}
-      </a>`).join('') : '<p class="vazio">Nenhuma tarefa para você no momento.</p>');
+      </a>`).join('') : '<p class="vazio">Nenhuma demanda para você no momento.</p>');
   };
 
   const guardadas = (await local.cacheLer(k)) || [];
@@ -59,7 +59,7 @@ export async function telaMinhas(el, _p, ctx) {
       if (!guardadas.length) $('#lista', el).innerHTML = `<p class="vazio">${esc(mensagemErro(e))}</p>`;
     }
   } else if (!guardadas.length) {
-    $('#lista', el).innerHTML = '<p class="vazio">Sem internet e nenhuma tarefa guardada ainda.</p>';
+    $('#lista', el).innerHTML = '<p class="vazio">Sem internet e nenhuma demanda guardada ainda.</p>';
   }
 
   const parar = navigator.onLine ? api.ouvir('minhas', [{ tabela: 'tarefas' }], () => ctx.recarregar()) : () => {};
@@ -80,7 +80,7 @@ export async function telaCampo(el, { id }, ctx) {
     } catch { /* usa a cópia local */ }
   }
   if (!tarefa) {
-    el.innerHTML = '<section class="pagina"><p class="vazio">Tarefa não disponível sem internet.</p><a class="btn" href="#/minhas">Voltar</a></section>';
+    el.innerHTML = '<section class="pagina"><p class="vazio">Demanda não disponível sem internet.</p><a class="btn" href="#/minhas">Voltar</a></section>';
     return null;
   }
 

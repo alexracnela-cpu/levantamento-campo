@@ -1,4 +1,4 @@
-// Telas do líder: painel de tarefas, nova tarefa, acompanhamento e equipe.
+// Telas do líder: painel de demandas, nova demanda, acompanhamento e equipe.
 
 import { api } from './api.js';
 import { criarMapa, desenharArea, DesenhoDeArea } from './mapa.js';
@@ -21,7 +21,7 @@ export async function telaPainel(el, _p, ctx) {
   el.innerHTML = `<section class="pagina">
     <div class="cabecalho-pagina">
       <h1>Levantamentos</h1>
-      <a class="btn primario" href="#/nova">+ Nova tarefa</a>
+      <a class="btn primario" href="#/nova">+ Nova demanda</a>
     </div>
     <div class="abas" role="tablist">
       ${[['todas', 'Todas'], ['pendente', 'Pendentes'], ['em_andamento', 'Em andamento'], ['concluido', 'Concluídas']]
@@ -48,7 +48,7 @@ export async function telaPainel(el, _p, ctx) {
     $$('.aba', el).forEach((b) => b.classList.toggle('ativa', b.dataset.f === filtro));
     const porStatus = tarefas.filter((t) => filtro === 'todas' || t.status === filtro);
 
-    // filtro por motoqueiro, com quantas tarefas cada um tem no filtro de status atual
+    // filtro por motoqueiro, com quantas demandas cada um tem no filtro de status atual
     const grupos = new Map();
     porStatus.forEach((t) => { const k = t.motoqueiro_id || 'nenhum'; grupos.set(k, (grupos.get(k) || 0) + 1); });
     if (filtroMoto !== 'todos' && !grupos.has(filtroMoto)) filtroMoto = 'todos';
@@ -76,7 +76,7 @@ export async function telaPainel(el, _p, ctx) {
   })()}</div>
         <p class="ct-meta ${prazoVencido(t.prazo, t.status) ? 'vencido' : ''}">Prazo: ${dataBR(t.prazo)}${prazoVencido(t.prazo, t.status) ? ' · atrasada' : ''}</p>
       </a>`;
-    }).join('') : '<p class="vazio">Nenhuma tarefa aqui.</p>';
+    }).join('') : '<p class="vazio">Nenhuma demanda aqui.</p>';
   };
 
   const carregar = async () => {
@@ -106,7 +106,7 @@ export async function telaPainel(el, _p, ctx) {
 }
 
 // ------------------------------------------------------------------
-// Nova tarefa
+// Nova demanda
 // ------------------------------------------------------------------
 export async function telaNovaTarefa(el, _p, ctx) {
   el.innerHTML = `<section class="tela-mapa">
@@ -122,7 +122,7 @@ export async function telaNovaTarefa(el, _p, ctx) {
       </div>
     </div>
     <aside class="painel-lateral">
-      <h2>Nova tarefa</h2>
+      <h2>Nova demanda</h2>
       <form id="form" class="formulario">
         <label>Título<input name="titulo" required maxlength="140" placeholder="Ex.: Levantamento Av. Djalma Batista"></label>
         <label>Descrição<textarea name="descricao" rows="3" placeholder="O que o motoqueiro deve levantar"></textarea></label>
@@ -131,7 +131,7 @@ export async function telaNovaTarefa(el, _p, ctx) {
         <label>Ofício ou encaminhamento (PDF ou imagem)<input type="file" name="oficio" accept="application/pdf,image/*"></label>
         <div class="linha-botoes">
           <a class="btn" href="#/painel">Cancelar</a>
-          <button class="btn primario" id="b-salvar">Criar tarefa</button>
+          <button class="btn primario" id="b-salvar">Criar demanda</button>
         </div>
       </form>
     </aside>
@@ -203,12 +203,12 @@ export async function telaNovaTarefa(el, _p, ctx) {
         area,
         ...oficio,
       });
-      aviso('Tarefa criada.', 'ok');
+      aviso('Demanda criada.', 'ok');
       ctx.navegar(`#/tarefa/${id}`);
     } catch (err) {
       aviso(mensagemErro(err), 'erro');
       botao.disabled = false;
-      botao.textContent = 'Criar tarefa';
+      botao.textContent = 'Criar demanda';
     }
   };
 
@@ -216,7 +216,7 @@ export async function telaNovaTarefa(el, _p, ctx) {
 }
 
 // ------------------------------------------------------------------
-// Acompanhamento de uma tarefa (tempo real)
+// Acompanhamento de uma demanda (tempo real)
 // ------------------------------------------------------------------
 export async function telaTarefaLider(el, { id }, ctx) {
   el.innerHTML = '<section class="pagina"><p class="vazio">Carregando…</p></section>';
@@ -229,7 +229,7 @@ export async function telaTarefaLider(el, { id }, ctx) {
     return null;
   }
   if (!tarefa) {
-    el.innerHTML = '<section class="pagina"><p class="vazio">Tarefa não encontrada.</p><a class="btn" href="#/painel">Voltar</a></section>';
+    el.innerHTML = '<section class="pagina"><p class="vazio">Demanda não encontrada.</p><a class="btn" href="#/painel">Voltar</a></section>';
     return null;
   }
 
@@ -258,7 +258,7 @@ export async function telaTarefaLider(el, { id }, ctx) {
       <div id="redes" class="resumo-redes"></div>
       <h3 class="titulo-secao">Pontos levantados <span id="n-pontos" class="contador">0</span></h3>
       <ol id="pontos" class="lista-pontos"></ol>
-      <div class="zona-perigo"><button class="btn perigo" id="b-excluir">Excluir tarefa</button></div>
+      <div class="zona-perigo"><button class="btn perigo" id="b-excluir">Excluir demanda</button></div>
     </aside>
   </section>`;
 
@@ -283,14 +283,14 @@ export async function telaTarefaLider(el, { id }, ctx) {
         ${tarefa.finalizacao_obs ? `<p>"${esc(tarefa.finalizacao_obs)}"</p>` : ''}
         <div class="linha-botoes"><button class="btn primario" id="b-concluir">Marcar como concluída</button>
         <button class="btn" id="b-devolver">Devolver ao motoqueiro</button></div></div>`;
-      $('#b-concluir', caixa).onclick = () => salvarCampo({ status: 'concluido' }, 'Tarefa concluída.').then(preencher);
+      $('#b-concluir', caixa).onclick = () => salvarCampo({ status: 'concluido' }, 'Demanda concluída.').then(preencher);
       $('#b-devolver', caixa).onclick = async () => {
-        if (!await confirmar('Devolver a tarefa ao motoqueiro? Ela volta a aparecer como não entregue.', 'Devolver')) return;
+        if (!await confirmar('Devolver a demanda ao motoqueiro? Ela volta a aparecer como não entregue.', 'Devolver')) return;
         try {
           await api.devolverTarefa(id);
           Object.assign(tarefa, { finalizada_em: null, finalizacao_obs: '' });
-          if (tarefa.status === 'concluido') await salvarCampo({ status: 'em_andamento' }, 'Tarefa devolvida.');
-          else aviso('Tarefa devolvida ao motoqueiro.', 'ok');
+          if (tarefa.status === 'concluido') await salvarCampo({ status: 'em_andamento' }, 'Demanda devolvida.');
+          else aviso('Demanda devolvida ao motoqueiro.', 'ok');
           preencher();
         } catch (e) { aviso(mensagemErro(e), 'erro'); }
       };
@@ -317,11 +317,11 @@ export async function telaTarefaLider(el, { id }, ctx) {
   $('#b-oficio', el).onclick = () => verOficio(tarefa);
   $('#b-enquadrar', el).onclick = () => poligono && mapa.fitBounds(poligono.getBounds(), { padding: [30, 30] });
   $('#b-excluir', el).onclick = async () => {
-    if (!await confirmar(`Excluir a tarefa "${tarefa.titulo}" com todos os pontos e fotos? Não dá para desfazer.`, 'Excluir')) return;
+    if (!await confirmar(`Excluir a demanda "${tarefa.titulo}" com todos os pontos e fotos? Não dá para desfazer.`, 'Excluir')) return;
     try {
       await api.apagarArquivosTarefa(id, tarefa.oficio_path);
       await api.excluirTarefa(id);
-      aviso('Tarefa excluída.', 'ok');
+      aviso('Demanda excluída.', 'ok');
       ctx.navegar('#/painel');
     } catch (e) { aviso(mensagemErro(e), 'erro'); }
   };

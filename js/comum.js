@@ -47,7 +47,7 @@ export async function guardarOficio(tarefa) {
 }
 
 export async function verOficio(tarefa) {
-  if (!tarefa?.oficio_path) { aviso('Esta tarefa não tem ofício anexado.'); return; }
+  if (!tarefa?.oficio_path) { aviso('Esta demanda não tem ofício anexado.'); return; }
   let arq;
   try {
     arq = await guardarOficio(tarefa);

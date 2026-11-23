@@ -69,8 +69,8 @@ function montarTopo() {
   topo.innerHTML = `
     <a class="marca" href="${INICIO[ctx.perfil.papel]}"><img src="icones/icone.svg" alt=""><span class="nome-marca">Ronda<b>Luz</b></span></a>
     <nav class="menu">
-      ${lider ? '<a href="#/painel" data-m="painel">Levantamentos</a><a href="#/equipe" data-m="equipe">Equipe</a><a href="#/minhas" data-m="minhas">Minhas tarefas</a>'
-    : '<a href="#/minhas" data-m="minhas">Minhas tarefas</a>'}
+      ${lider ? '<a href="#/painel" data-m="painel">Levantamentos</a><a href="#/equipe" data-m="equipe">Equipe</a><a href="#/minhas" data-m="minhas">Minhas demandas</a>'
+    : '<a href="#/minhas" data-m="minhas">Minhas demandas</a>'}
     </nav>
     <button id="b-avisos" class="sinc avisos-btn" title="Receber avisos neste aparelho" hidden>🔔 Ativar avisos</button>
     <button id="sinc" class="sinc" title="Envio de dados"></button>

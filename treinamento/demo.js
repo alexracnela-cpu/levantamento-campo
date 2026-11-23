@@ -333,9 +333,9 @@ function criarSb(inst) {
       return { data: null, error: null };
     }
     const t = DB.dados.tarefas.find((x) => x.id === args.t);
-    if (!t) return { data: null, error: { message: 'Tarefa não encontrada' } };
+    if (!t) return { data: null, error: { message: 'Demanda não encontrada' } };
     if (nome === 'finalizar_tarefa') {
-      if (!tarefaMinha(t.id)) return { data: null, error: { message: 'Esta tarefa não é sua.' } };
+      if (!tarefaMinha(t.id)) return { data: null, error: { message: 'Esta demanda não é sua.' } };
       Object.assign(t, { finalizada_em: new Date().toISOString(), finalizacao_obs: args.obs || '' });
       if (t.status === 'pendente') t.status = 'em_andamento';
       notificar('tarefas', 'UPDATE', t);
