@@ -27,12 +27,11 @@ body {
   color: var(--texto);
   background-color: #eef4fb;
   background-image:
-    url("../icones/fundo-canto.svg"),
     url("../icones/fundo-canto-2.svg"),
     radial-gradient(ellipse at 45% 40%, #ffffff 0%, #f3f8fd 42%, #d3e4f6 100%);
   background-repeat: no-repeat;
-  background-position: top left, bottom right, center;
-  background-size: min(44vw, 560px) auto, min(44vw, 560px) auto, cover;
+  background-position: bottom right, center;
+  background-size: min(30vw, 360px) auto, cover;
   background-attachment: fixed;
   -webkit-tap-highlight-color: transparent;
 }
@@ -194,7 +193,12 @@ textarea { resize: vertical; }
 .voce { color: var(--suave); font-weight: 400; }
 
 /* ---------------- acesso ---------------- */
-.acesso { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 20px; }
+.acesso { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 20px; 
+  background:
+    url("../icones/fundo-canto.svg") top left / min(44vw, 560px) auto no-repeat,
+    url("../icones/fundo-canto-2.svg") bottom right / min(44vw, 560px) auto no-repeat,
+    radial-gradient(ellipse at 45% 40%, #ffffff 0%, #f3f8fd 42%, #d3e4f6 100%);
+}
 .acesso-caixa { width: 100%; max-width: 400px; background: rgba(255, 255, 255, .92); border: 1px solid var(--linha); border-top: 6px solid var(--tinta); border-radius: 12px; padding: 26px 24px; box-shadow: 0 18px 48px rgba(0, 60, 120, .18); backdrop-filter: blur(4px); }
 .acesso-marca { text-align: center; margin-bottom: 18px; }
 .acesso-marca h1 { font-size: 2.4rem; margin: 6px 0 0; }
@@ -361,3 +365,18 @@ body.modo-campo .aviso.mostrar { transform: translate(-50%, 0); }
 .aviso-entrega p { margin: 6px 0 0; font-style: italic; }
 .resumo-entrega { padding-left: 18px; }
 .alerta-texto { color: #9a4a00; font-weight: 600; }
+
+/* painel: motoqueiro em destaque */
+.ct-topo { flex-wrap: wrap; gap: 6px; justify-content: flex-start; }
+.ct-topo .selo { white-space: nowrap; }
+.ct-moto { display: flex; align-items: center; gap: 10px; margin: 6px 0 8px; padding: 8px 10px; background: var(--tinta-clara); border-radius: 8px; }
+.ct-moto b { display: block; color: var(--tinta); font-size: 1rem; }
+.ct-moto small { display: block; color: var(--suave); font-size: .82rem; }
+.avatar { display: inline-grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 50%; color: #fff; font: 700 .8rem var(--corpo); letter-spacing: .3px; }
+.filtro-motos { display: flex; flex-wrap: wrap; gap: 6px; margin: -6px 0 16px; }
+.chip-moto { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px 4px 4px; border: 1px solid var(--linha); background: var(--cartao); border-radius: 20px; font: 600 .88rem var(--corpo); color: var(--tinta); cursor: pointer; }
+.chip-moto[data-m=todos] { padding-left: 12px; }
+.chip-moto .avatar { width: 26px; height: 26px; font-size: .7rem; }
+.chip-moto small { color: var(--suave); font-weight: 600; }
+.chip-moto.ativo { background: var(--tinta); color: #fff; border-color: var(--tinta); }
+.chip-moto.ativo small { color: #cfe0f4; }

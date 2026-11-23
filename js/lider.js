@@ -16,6 +16,7 @@ import {
 // ------------------------------------------------------------------
 export async function telaPainel(el, _p, ctx) {
   let filtro = sessionStorage.getItem('rondaluz-filtro') || 'todas';
+  let filtroMoto = sessionStorage.getItem('rondaluz-filtro-moto') || 'todos';
   el.innerHTML = `<section class="pagina">
     <div class="cabecalho-pagina">
       <h1>Levantamentos</h1>
@@ -25,6 +26,7 @@ export async function telaPainel(el, _p, ctx) {
       ${[['todas', 'Todas'], ['pendente', 'Pendentes'], ['em_andamento', 'Em andamento'], ['concluido', 'Concluídas']]
     .map(([v, t]) => `<button class="aba" data-f="${v}" role="tab">${t}</button>`).join('')}
     </div>
+    <div id="motos" class="filtro-motos" aria-label="Filtrar por motoqueiro"></div>
     <div id="lista" class="lista-tarefas"><p class="vazio">Carregando…</p></div>
   </section>`;
 
@@ -32,16 +34,45 @@ export async function telaPainel(el, _p, ctx) {
   let contagem = {};
   let equipe = {};
 
+  const iniciais = (nome) => String(nome || '?').trim().split(/\s+/).filter((p) => !p.startsWith('(')).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?';
+  const corDe = (id) => {
+    const cores = ['#1f63ad', '#2f7d4a', '#8a4fb0', '#c2620a', '#0f7f8c', '#a23b5a', '#4b5fb8'];
+    let h = 0;
+    for (const c of String(id || '')) h = (h * 31 + c.charCodeAt(0)) % 997;
+    return id ? cores[h % cores.length] : '#8a93a6';
+  };
+  const avatar = (id, nome) => `<span class="avatar" style="background:${corDe(id)}">${esc(iniciais(nome))}</span>`;
+
   const render = () => {
     $$('.aba', el).forEach((b) => b.classList.toggle('ativa', b.dataset.f === filtro));
-    const lista = tarefas.filter((t) => filtro === 'todas' || t.status === filtro);
-    $('#lista', el).innerHTML = lista.length ? lista.map((t) => `
+    const porStatus = tarefas.filter((t) => filtro === 'todas' || t.status === filtro);
+
+    // filtro por motoqueiro, com quantas tarefas cada um tem no filtro de status atual
+    const grupos = new Map();
+    porStatus.forEach((t) => { const k = t.motoqueiro_id || 'nenhum'; grupos.set(k, (grupos.get(k) || 0) + 1); });
+    if (filtroMoto !== 'todos' && !grupos.has(filtroMoto)) filtroMoto = 'todos';
+    const chips = [...grupos.entries()].sort((a, b) => (equipe[a[0]]?.nome || 'zz').localeCompare(equipe[b[0]]?.nome || 'zz'));
+    $('#motos', el).innerHTML = `<button class="chip-moto ${filtroMoto === 'todos' ? 'ativo' : ''}" data-m="todos">Todos <small>${porStatus.length}</small></button>`
+      + chips.map(([k, n]) => {
+        const nome = k === 'nenhum' ? 'Sem motoqueiro' : (equipe[k]?.nome || equipe[k]?.email || '—');
+        return `<button class="chip-moto ${filtroMoto === k ? 'ativo' : ''}" data-m="${esc(k)}">${avatar(k === 'nenhum' ? '' : k, nome)}${esc(nome)} <small>${n}</small></button>`;
+      }).join('');
+    $$('.chip-moto', el).forEach((b) => {
+      b.onclick = () => { filtroMoto = b.dataset.m; sessionStorage.setItem('rondaluz-filtro-moto', filtroMoto); render(); };
+    });
+
+    const lista = porStatus.filter((t) => filtroMoto === 'todos' || (t.motoqueiro_id || 'nenhum') === filtroMoto);
+    $('#lista', el).innerHTML = lista.length ? lista.map((t) => {
+      const m = equipe[t.motoqueiro_id];
+      const nome = m?.nome || m?.email || 'Sem motoqueiro';
+      return `
       <a class="cartao-tarefa" href="#/tarefa/${t.id}">
-        <div class="ct-topo">${seloStatus(t.status)}${t.finalizada_em && t.status !== 'concluido' ? ' <span class="selo selo-entregue">✓ entregue — revisar</span>' : ''}<span class="ct-pontos">${contagem[t.id] || 0} ponto(s)</span></div>
+        <div class="ct-topo">${seloStatus(t.status)}${t.finalizada_em && t.status !== 'concluido' ? '<span class="selo selo-entregue">✓ entregue — revisar</span>' : ''}</div>
         <h3>${esc(t.titulo)}</h3>
-        <p class="ct-meta">Motoqueiro: <b>${esc(equipe[t.motoqueiro_id]?.nome || '— sem motoqueiro —')}</b></p>
+        <div class="ct-moto">${avatar(t.motoqueiro_id, nome)}<div><b>${esc(nome)}</b><small>${contagem[t.id] || 0} ponto(s) levantado(s)</small></div></div>
         <p class="ct-meta ${prazoVencido(t.prazo, t.status) ? 'vencido' : ''}">Prazo: ${dataBR(t.prazo)}${prazoVencido(t.prazo, t.status) ? ' · atrasada' : ''}</p>
-      </a>`).join('') : '<p class="vazio">Nenhuma tarefa aqui ainda.</p>';
+      </a>`;
+    }).join('') : '<p class="vazio">Nenhuma tarefa aqui.</p>';
   };
 
   const carregar = async () => {
