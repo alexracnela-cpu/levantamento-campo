@@ -5,7 +5,6 @@ import { local } from './store.js';
 import { iniciarSincronizacao, aoMudarFila, sincronizar, estadoFila } from './sync.js';
 import { telaPainel, telaNovaTarefa, telaTarefaLider, telaEquipe } from './lider.js';
 import { telaMinhas, telaCampo } from './motoqueiro.js';
-import { svgSimbolo } from './simbolo.js';
 import { $, esc, aviso, mensagemErro } from './util.js';
 
 const tela = document.getElementById('tela');
@@ -65,7 +64,7 @@ function montarTopo() {
   const lider = ctx.perfil.papel === 'lider';
   topo.hidden = false;
   topo.innerHTML = `
-    <a class="marca" href="${INICIO[ctx.perfil.papel]}">${svgSimbolo(16)}<span>RondaLuz</span></a>
+    <a class="marca" href="${INICIO[ctx.perfil.papel]}"><img src="icones/icone-64.png" alt=""><span class="nome-marca">Ronda<b>Luz</b></span></a>
     <nav class="menu">
       ${lider ? '<a href="#/painel" data-m="painel">Levantamentos</a><a href="#/equipe" data-m="equipe">Equipe</a><a href="#/minhas" data-m="minhas">Minhas tarefas</a>'
     : '<a href="#/minhas" data-m="minhas">Minhas tarefas</a>'}
@@ -110,7 +109,7 @@ function telaAcesso(modo = 'entrar') {
   topo.hidden = true;
   tela.innerHTML = `<section class="acesso">
     <div class="acesso-caixa">
-      <div class="acesso-marca">${svgSimbolo(34)}<h1>RondaLuz</h1><p>Levantamentos de iluminação pública · Manaus</p></div>
+      <div class="acesso-marca"><img src="icones/icone-192.png" alt="" width="88" height="88"><h1 class="nome-marca">Ronda<b>Luz</b></h1><p>Levantamentos de iluminação pública · Manaus</p></div>
       <div class="abas">
         <button class="aba ${modo === 'entrar' ? 'ativa' : ''}" data-modo="entrar">Entrar</button>
         <button class="aba ${modo === 'criar' ? 'ativa' : ''}" data-modo="criar">Criar conta</button>
@@ -151,7 +150,7 @@ function telaAcesso(modo = 'entrar') {
 function telaSemConfiguracao() {
   topo.hidden = true;
   tela.innerHTML = `<section class="acesso"><div class="acesso-caixa">
-    <div class="acesso-marca">${svgSimbolo(34)}<h1>RondaLuz</h1></div>
+    <div class="acesso-marca"><img src="icones/icone-192.png" alt="" width="88" height="88"><h1 class="nome-marca">Ronda<b>Luz</b></h1></div>
     <h2>Falta ligar o Supabase</h2>
     <p>Abra o arquivo <code>js/config.js</code> e cole a <b>Project URL</b> e a chave <b>publishable</b>
     (Supabase → botão Connect). Depois rode o <code>supabase/schema.sql</code> no SQL Editor.</p>
