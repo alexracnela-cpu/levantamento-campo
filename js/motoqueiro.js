@@ -326,6 +326,14 @@ export async function telaCampo(el, { id }, ctx) {
     if (s) s.selecionar(true);
     el.querySelector('.tela-campo').classList.toggle('com-ficha', !!s);
     renderFicha();
+    if (s) {
+      // garante que o ponto fique visível acima da ficha, perto o bastante para mexer
+      if (mapa.getZoom() < 19) mapa.setView(s.latlng, 19, { animate: false });
+      const alto = mapa.getSize().y;
+      const y = mapa.latLngToContainerPoint(s.latlng).y;
+      const alvo = alto * 0.25;
+      if (Math.abs(y - alvo) > 20) mapa.panBy([0, y - alvo], { animate: true });
+    }
   }
 
   const novoPonto = (lat, lng) => {

@@ -101,6 +101,13 @@ export class SimboloNoMapa {
     }).addTo(this.grupo);
     this.cBraco = L.polyline([], { ...estilo, weight: 3 }).addTo(this.grupo);
     this.cGarra = L.polyline([], { ...estilo, weight: 3 }).addTo(this.grupo);
+    // pino que aparece quando o mapa está afastado (o símbolo em escala real fica minúsculo)
+    this.pino = L.circleMarker(this.latlng, {
+      radius: 7, color: '#fff', weight: 2, fillColor: VERMELHO, fillOpacity: 1, bubblingMouseEvents: false,
+    });
+    this.pino.on('click', (e) => { L.DomEvent.stopPropagation(e); this.aoTocar?.(this); });
+    this.aoZoom = () => this.ajustarPino();
+    mapa.on('zoomend', this.aoZoom);
 
     this.grupo.on('click', (e) => {
       L.DomEvent.stopPropagation(e);
@@ -109,6 +116,13 @@ export class SimboloNoMapa {
 
     if (editavel) this.criarAlcas();
     this.desenhar();
+    this.ajustarPino();
+  }
+
+  ajustarPino() {
+    const afastado = this.mapa.getZoom() < 18;
+    if (afastado && !this.mapa.hasLayer(this.pino)) this.pino.addTo(this.mapa);
+    if (!afastado && this.mapa.hasLayer(this.pino)) this.pino.remove();
   }
 
   get latlng() { return [this.ponto.lat, this.ponto.lng]; }
@@ -130,6 +144,8 @@ export class SimboloNoMapa {
     const cor = fora ? '#d97706' : TINTA;
     [this.cExterno, this.cInterno, this.cBraco, this.cGarra].forEach((c) => c.setStyle({ color: cor }));
     this.cExterno.setStyle({ weight: this.selecionado ? 3.5 : 2, dashArray: fora ? '4 3' : null });
+    this.pino.setLatLng(this.latlng);
+    this.pino.setStyle({ fillColor: fora ? '#d97706' : VERMELHO, radius: this.selecionado ? 9 : 7 });
     if (this.alcaCentro && !this.arrastandoCentro) this.alcaCentro.setLatLng(this.latlng);
     if (this.alcaPonta && !this.arrastandoPonta) this.alcaPonta.setLatLng(this.pontoMapa(f.ponta));
   }
@@ -177,6 +193,8 @@ export class SimboloNoMapa {
   }
 
   remover() {
+    this.mapa.off('zoomend', this.aoZoom);
+    this.pino.remove();
     this.grupo.remove();
     this.alcaCentro?.remove();
     this.alcaPonta?.remove();
