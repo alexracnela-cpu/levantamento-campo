@@ -18,7 +18,7 @@ Tudo em HTML, CSS e JavaScript, sem etapa de build. Mapa com Leaflet (OpenStreet
 2. **SQL Editor → New query**: cole todo o arquivo `supabase/schema.sql` e clique em **Run**.
    Ele cria as tabelas, as regras de acesso, os buckets `oficios` e `fotos` e liga o tempo real.
 3. **Authentication → Sign In / Providers → Email**: desligue **Confirm email** e salve.
-4. **Project Settings → API**: copie a **Project URL** e a chave **anon public**.
+4. No topo do projeto, copie a **Project URL** e a chave **publishable** (`sb_publishable_...`).
 5. Abra `js/config.js` e cole os dois valores.
 
 > Rode o `schema.sql` **antes** de criar a primeira conta: é ele que transforma a primeira conta em líder.

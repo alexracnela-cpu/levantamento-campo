@@ -153,8 +153,8 @@ function telaSemConfiguracao() {
   tela.innerHTML = `<section class="acesso"><div class="acesso-caixa">
     <div class="acesso-marca">${svgSimbolo(34)}<h1>RondaLuz</h1></div>
     <h2>Falta ligar o Supabase</h2>
-    <p>Abra o arquivo <code>js/config.js</code> e cole a <b>Project URL</b> e a chave <b>anon public</b>
-    (Supabase → Project Settings → API). Depois rode o <code>supabase/schema.sql</code> no SQL Editor.</p>
+    <p>Abra o arquivo <code>js/config.js</code> e cole a <b>Project URL</b> e a chave <b>publishable</b>
+    (Supabase → botão Connect). Depois rode o <code>supabase/schema.sql</code> no SQL Editor.</p>
   </div></section>`;
 }
 

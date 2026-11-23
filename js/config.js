@@ -1,7 +1,7 @@
-// Configuração do Supabase.
-// Supabase > Project Settings > API: copie a "Project URL" e a chave "anon public".
-// A chave anon pode ficar no código: quem protege os dados são as regras de acesso (RLS).
+// Configuração do Supabase (botão Connect do projeto, ou Settings > API Keys).
+// A chave publishable pode ficar no código: quem protege os dados são as regras de acesso (RLS).
+// NUNCA coloque aqui a chave secret (sb_secret_...) nem a service_role.
 window.RONDALUZ_CONFIG = {
-  SUPABASE_URL: 'COLE_AQUI_A_PROJECT_URL',
-  SUPABASE_ANON_KEY: 'COLE_AQUI_A_CHAVE_ANON',
+  SUPABASE_URL: 'https://cpbavsbaqmggsuxsvjse.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_13WwPlDjG-gf29Kga7X5AA_cD-eJNAK',
 };
