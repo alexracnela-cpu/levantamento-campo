@@ -93,13 +93,20 @@ export const api = {
   },
 
   // ---- tempo real
+  // Cada chamada abre um canal com nome único: o supabase-js reaproveita canais de mesmo nome,
+  // e reabrir uma tela antes de o canal anterior fechar dava erro.
   ouvir(nome, tabelas, aoMudar) {
-    const canal = sb.channel(nome);
-    tabelas.forEach(({ tabela, filtro }) => {
-      canal.on('postgres_changes', { event: '*', schema: 'public', table: tabela, ...(filtro ? { filter: filtro } : {}) },
-        (p) => aoMudar(tabela, p));
-    });
-    canal.subscribe();
-    return () => sb.removeChannel(canal);
+    let canal = null;
+    try {
+      canal = sb.channel(`${nome}-${Math.random().toString(36).slice(2, 10)}`);
+      tabelas.forEach(({ tabela, filtro }) => {
+        canal.on('postgres_changes', { event: '*', schema: 'public', table: tabela, ...(filtro ? { filter: filtro } : {}) },
+          (p) => { try { aoMudar(tabela, p); } catch (e) { console.warn('Aviso ao vivo:', e); } });
+      });
+      canal.subscribe();
+    } catch (e) {
+      console.warn('Atualização ao vivo indisponível:', e);
+    }
+    return () => { if (canal) sb.removeChannel(canal).catch(() => {}); };
   },
 };

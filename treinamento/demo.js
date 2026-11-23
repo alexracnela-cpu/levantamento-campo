@@ -427,7 +427,7 @@ function criarSb(inst) {
         subscribe() { DB.canais.add(this); return this; },
       };
     },
-    removeChannel(c) { DB.canais.delete(c); },
+    removeChannel(c) { DB.canais.delete(c); return Promise.resolve('ok'); },
   };
 }
 
