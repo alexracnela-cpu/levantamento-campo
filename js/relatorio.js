@@ -2,7 +2,10 @@
 // Contém dados da demanda, resumo, mapa com pontos numerados e rede, tabela de pontos,
 // rede por trecho e a ficha de cada ponto com as fotos.
 
-import { formasDoBloco, blocoParaMapa, bracosDoPonto, qtdLuminarias } from './simbolo.js';
+import {
+  blocoParaMapa, pecasDoPonto, svgPecas, svgPoste, svgLuminaria, tipoPoste, situacaoLuminaria, nomePoste, nomeSituacao,
+  equipamento, EQUIPAMENTOS,
+} from './simbolo.js';
 import {
   comprimentoM, metragemRede, medidaInformada, formatarMetros, TIPOS, SITUACOES, CORES,
 } from './rede.js';
@@ -12,7 +15,6 @@ import {
 
 const STATUS_TXT = { pendente: 'Pendente', em_andamento: 'Em andamento', concluido: 'Concluído' };
 const AZUL = '#003c78';
-const VERMELHO = '#e00000';
 
 // Permite trocar o fundo do mapa (o treinamento desenha ruas ilustrativas).
 export const opcoesRelatorio = { desenharFundo: null };
@@ -102,7 +104,6 @@ export async function mapaEstatico({ area, pontos, redes }, W = 1600, H = 1000) 
   });
 
   // símbolos em escala real + número de cada ponto
-  const f = formasDoBloco();
   const desenharForma = (lista, p, fechar) => {
     g.beginPath();
     lista.forEach((xy, i) => {
@@ -113,16 +114,10 @@ export async function mapaEstatico({ area, pontos, redes }, W = 1600, H = 1000) 
     if (fechar) g.closePath();
   };
   pontos.forEach((p, i) => {
-    g.lineWidth = 2; g.strokeStyle = AZUL;
-    desenharForma(f.quadrado, p, true); g.fillStyle = 'rgba(255,255,255,.8)'; g.fill(); g.stroke();
-    desenharForma(f.poste, p, true); g.stroke();
-    const bracos = bracosDoPonto(f, qtdLuminarias(p));
-    [...f.centro, ...bracos.flatMap((b) => b.braco)].forEach((l) => { desenharForma(l, p, false); g.stroke(); });
-    bracos.forEach((b) => {
-      g.strokeStyle = VERMELHO;
-      desenharForma(b.luminaria, p, true); g.fillStyle = 'rgba(255,255,255,.8)'; g.fill(); g.stroke();
-      desenharForma(b.vermelho, p, true); g.fillStyle = VERMELHO; g.fill();
-      desenharForma(b.encaixe, p, true); g.fillStyle = '#fff'; g.fill(); g.stroke();
+    pecasDoPonto(p, { tinta: AZUL, opFundo: 0.8 }).forEach((pc) => {
+      desenharForma(pc.pts, p, pc.fechada);
+      if (pc.preench) { g.globalAlpha = pc.opacidade ?? 1; g.fillStyle = pc.preench; g.fill(); g.globalAlpha = 1; }
+      if (pc.traco) { g.lineWidth = pc.principal ? 2.4 : Math.max(1.2, pc.peso); g.strokeStyle = pc.traco; g.stroke(); }
     });
     const [x, y] = P(p.lat, p.lng);
     const bx = x - 20; const by = y - 22;
@@ -158,10 +153,13 @@ export async function mapaEstatico({ area, pontos, redes }, W = 1600, H = 1000) 
 // ------------------------------------------------------------------
 const coord = (p) => `${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`;
 
-function svgSimboloPequeno() {
-  const f = formasDoBloco();
-  const s = (l) => l.map(([x, y]) => `${(x * 100).toFixed(1)},${(-y * 100).toFixed(1)}`).join(' ');
-  return `<svg viewBox="-20 -20 122 40" width="66" height="22"><polygon points="${s(f.quadrado)}" fill="#fff" stroke="${AZUL}" stroke-width="2.4"/><polygon points="${s(f.poste)}" fill="none" stroke="${AZUL}" stroke-width="1.6"/><g fill="none" stroke="${AZUL}" stroke-width="1.4">${[...f.centro, ...f.braco].map((l) => `<polyline points="${s(l)}"/>`).join('')}</g><polygon points="${s(f.luminaria)}" fill="#fff" stroke="${VERMELHO}" stroke-width="1.6"/><polygon points="${s(f.vermelho)}" fill="${VERMELHO}"/><polygon points="${s(f.encaixe)}" fill="#fff" stroke="${VERMELHO}" stroke-width="1.4"/></svg>`;
+const tipoTexto = (p) => nomePoste(tipoPoste(p));
+const lumTexto = (p) => `${equipamento(p) === 'projetor' ? 'proj.' : 'lum.'} ${nomeSituacao(p).toLowerCase()}`;
+
+function svgPontoPequeno(p) {
+  return svgPecas(pecasDoPonto({ ...p, rotacao: 90, qtd_luminarias: 1 }, { tinta: AZUL, opFundo: 1 }), {
+    viewBox: '-20 -20 122 40', largura: 66, altura: 22,
+  });
 }
 
 function linhaRede(tipo, situacao) {
@@ -217,7 +215,7 @@ export async function montarRelatorio({ tarefa, equipe, pontos, fotos, urls, red
   .info div span { display: block; font-size: 8pt; color: #6b7385; text-transform: uppercase; letter-spacing: .3px; }
   .info div b { font-size: 10pt; color: #1d2433; }
   .obs-final { border-left: 4px solid #2f7d4a; background: #eef7f0; padding: 8px 12px; border-radius: 4px; margin: 8px 0; }
-  .resumo { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 10px 0 12px; }
+  .resumo { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; margin: 10px 0 12px; }
   .resumo div { border: 1px solid #cddcee; border-radius: 6px; padding: 8px 10px; text-align: center; }
   .resumo b { display: block; font: 700 16pt Arial; color: #003c78; }
   .resumo span { font-size: 8.5pt; color: #6b7385; }
@@ -264,7 +262,8 @@ ${previa ? '<div class="marca-dagua">PRÉVIA</div>' : ''}
   ${tarefa.finalizacao_obs ? `<div class="obs-final"><b>Observação final do motoqueiro:</b> ${esc(tarefa.finalizacao_obs)}</div>` : ''}
   <div class="resumo">
     <div><b>${pontos.length}</b><span>pontos levantados</span></div>
-    <div><b>${pontos.reduce((t, p) => t + (p.qtd_luminarias ?? 1), 0)}</b><span>luminárias</span></div>
+    <div><b>${pontos.filter((p) => equipamento(p) === 'luminaria').reduce((t, p) => t + (p.qtd_luminarias ?? 1), 0)}</b><span>luminárias</span></div>
+    ${pontos.some((p) => equipamento(p) === 'projetor') ? `<div><b>${pontos.filter((p) => equipamento(p) === 'projetor').reduce((t, p) => t + (p.qtd_luminarias ?? 1), 0)}</b><span>projetores</span></div>` : ''}
     <div class="${semPlaqueta ? 'alerta' : ''}"><b>${semPlaqueta}</b><span>sem plaqueta</span></div>
     <div class="${fora ? 'alerta' : ''}"><b>${fora}</b><span>fora da área</span></div>
     <div><b>${formatarMetros(totalRede)}</b><span>de rede desenhada</span></div>
@@ -274,14 +273,19 @@ ${previa ? '<div class="marca-dagua">PRÉVIA</div>' : ''}
   <div class="mapa">${mapa ? `<img src="${mapa}" alt="Mapa do levantamento">` : '<p class="sem-fotos">Mapa indisponível.</p>'}</div>
   <div class="legenda">
     <span><svg width="26" height="12"><rect x="1" y="1" width="24" height="10" fill="rgba(31,99,173,.08)" stroke="${AZUL}" stroke-width="2" stroke-dasharray="5 3"/></svg> Área do levantamento</span>
-    <span>${svgSimboloPequeno()} Ponto (em escala real)</span>
+    ${[...new Set(pontos.map(tipoPoste))].map((t) => `<span>${svgPoste(t, 20)} ${t === 'sem_poste' ? 'Sem poste' : `Poste ${nomePoste(t).toLowerCase()}`}</span>`).join('')}
+    ${[...new Set(pontos.map((p) => `${equipamento(p)}|${situacaoLuminaria(p)}`))].map((k) => {
+    const [eq, sit] = k.split('|');
+    return `<span>${svgLuminaria(sit, 12, eq)} ${EQUIPAMENTOS[eq]} ${nomeSituacao({ equipamento: eq, luminaria: sit }).toLowerCase()}</span>`;
+  }).join('')}
+    ${pontos.length ? '' : `<span>${svgPontoPequeno({})} Ponto (em escala real)</span>`}
     <span><i class="num">1</i> Número do ponto</span>
     ${Object.keys(TIPOS).map((t) => Object.keys(SITUACOES).map((sit) => `<span>${linhaRede(t, sit)} ${TIPOS[t]} ${SITUACOES[sit].toLowerCase()}</span>`).join('')).join('')}
   </div>
 
   <h2>Pontos levantados</h2>
   ${pontos.length ? `<table><thead><tr><th>Nº</th><th>Plaqueta</th><th>Poste</th><th>Lum.</th><th>Coordenadas (lat, long)</th><th>Tamanho / rumo</th><th>Fotos</th><th>Observações</th></tr></thead><tbody>
-    ${pontos.map((p, i) => `<tr><td><b>${i + 1}</b></td><td>${p.plaqueta ? esc(p.plaqueta) : '<span class="fora">sem plaqueta</span>'}</td><td>${esc(p.poste || '—')}</td><td>${p.qtd_luminarias ?? 1}</td>
+    ${pontos.map((p, i) => `<tr><td><b>${i + 1}</b></td><td>${p.plaqueta ? esc(p.plaqueta) : '<span class="fora">sem plaqueta</span>'}</td><td>${tipoTexto(p)}${p.poste ? ` · ${esc(p.poste)}` : ''}</td><td>${p.qtd_luminarias ?? 1} ${lumTexto(p)}</td>
       <td>${coord(p)}${p.fora_da_area ? '<br><span class="fora">fora da área</span>' : ''}</td>
       <td>${String(p.tamanho_m).replace('.', ',')} m · ${Math.round(p.rotacao)}°</td><td>${fotosDo(p.id).length}</td>
       <td>${esc(p.observacoes || '—')}</td></tr>`).join('')}
@@ -298,7 +302,7 @@ ${previa ? '<div class="marca-dagua">PRÉVIA</div>' : ''}
     const fs = fotosDo(p.id);
     return `<div class="ficha ${fs.length > 2 ? 'longa' : ''}">
       <div class="ficha-cab"><i class="num">${i + 1}</i><h3>${nome(p, i)}</h3>${p.fora_da_area ? '<span class="selo previa">fora da área</span>' : ''}</div>
-      <div class="dados">${p.poste ? `Poste: <b>${esc(p.poste)}</b> · ` : ''}Luminárias: <b>${p.qtd_luminarias ?? 1}</b> · Coordenadas: <b>${coord(p)}</b> · Tamanho: <b>${String(p.tamanho_m).replace('.', ',')} m</b> · Rumo: <b>${Math.round(p.rotacao)}°</b> · Registrado em ${horaBR(p.criado_em)}</div>
+      <div class="dados">Poste: <b>${tipoTexto(p)}${p.poste ? ` ${esc(p.poste)}` : ''}</b> · ${equipamento(p) === 'projetor' ? 'Projetores' : 'Luminárias'}: <b>${p.qtd_luminarias ?? 1} ${nomeSituacao(p).toLowerCase()}</b> · Coordenadas: <b>${coord(p)}</b> · Tamanho: <b>${String(p.tamanho_m).replace('.', ',')} m</b> · Rumo: <b>${Math.round(p.rotacao)}°</b> · Registrado em ${horaBR(p.criado_em)}</div>
       ${p.observacoes ? `<div class="obs">${esc(p.observacoes)}</div>` : '<div class="dados">Sem observações.</div>'}
       ${fs.length ? `<div class="fotos">${fs.map((f, k) => `<figure><img src="${urls[f.path]}" alt="Foto ${k + 1}"><figcaption>Foto ${k + 1} · ${horaBR(f.criado_em)}</figcaption></figure>`).join('')}</div>` : '<p class="sem-fotos">Sem fotos.</p>'}
     </div>`;

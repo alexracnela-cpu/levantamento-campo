@@ -5,6 +5,8 @@ import { local } from './store.js';
 import { criarMapa, desenharArea, MinhaPosicao } from './mapa.js';
 import {
   SimboloNoMapa, limitarTamanho, normalizarRumo, svgSimbolo, TAMANHO_PADRAO,
+  TIPOS_POSTE, SITUACOES_LUMINARIA, EQUIPAMENTOS, SEM_POSTE, svgPoste, svgLuminaria,
+  tipoPoste, situacaoLuminaria, equipamento, nomePoste, nomeSituacao,
 } from './simbolo.js';
 import { abrirModal, confirmar, verOficio, guardarOficio, seloStatus } from './comum.js';
 import {
@@ -17,6 +19,52 @@ import {
 import {
   $, $$, esc, aviso, dataBR, prazoVencido, novoId, dentroDoPoligono, comprimirFoto, mensagemErro, diasComPessoa,
 } from './util.js';
+
+// ------------------------------------------------------------------
+// Tipo de poste e luminária: o próximo ponto já nasce com a última escolha.
+// ------------------------------------------------------------------
+const escolhaGuardada = () => {
+  const eq = equipamento({ equipamento: localStorage.getItem('rondaluz-equipamento') });
+  return {
+    equipamento: eq,
+    tipo_poste: tipoPoste({ tipo_poste: localStorage.getItem('rondaluz-tipo-poste'), equipamento: eq }),
+    luminaria: situacaoLuminaria({ luminaria: localStorage.getItem('rondaluz-luminaria') }),
+  };
+};
+const guardarEscolha = (e) => {
+  localStorage.setItem('rondaluz-equipamento', e.equipamento);
+  localStorage.setItem('rondaluz-tipo-poste', e.tipo_poste);
+  localStorage.setItem('rondaluz-luminaria', e.luminaria);
+};
+
+// Desenha os botões de escolha dentro de "caixa" e redesenha a cada toque.
+// aoEscolher recebe a escolha completa { equipamento, tipo_poste, luminaria }.
+function montarEscolha(caixa, inicial, aoEscolher) {
+  const atual = { ...inicial };
+  const desenhar = () => {
+    const proj = atual.equipamento === 'projetor';
+    const postes = [...Object.keys(TIPOS_POSTE), ...(proj ? [SEM_POSTE] : [])];
+    caixa.innerHTML = `<div class="seg escolha-eq" role="group" aria-label="Equipamento">
+        ${Object.entries(EQUIPAMENTOS).map(([v, nome]) => `<button type="button" data-equipamento="${v}" aria-pressed="${atual.equipamento === v}">${svgLuminaria(atual.luminaria, 16, v)} ${nome}</button>`).join('')}
+      </div>
+      <div class="escolha-poste ${proj ? 'com-sem-poste' : ''}" role="group" aria-label="Tipo de poste">
+        ${postes.map((v) => `<button type="button" data-tipo-poste="${v}" aria-pressed="${atual.tipo_poste === v}">${svgPoste(v, 34)}<span>${nomePoste(v)}</span></button>`).join('')}
+      </div>
+      <div class="seg escolha-lum" role="group" aria-label="Existente ou novo">
+        ${Object.keys(SITUACOES_LUMINARIA).map((v) => `<button type="button" data-luminaria="${v}" aria-pressed="${atual.luminaria === v}">${svgLuminaria(v, 16, atual.equipamento)} ${nomeSituacao({ ...atual, luminaria: v })}</button>`).join('')}
+      </div>`;
+    const mudar = (campo, valor) => {
+      atual[campo] = valor;
+      atual.tipo_poste = tipoPoste(atual); // luminária não fica "sem poste"
+      desenhar();
+      aoEscolher({ ...atual });
+    };
+    $$('[data-equipamento]', caixa).forEach((b) => { b.onclick = () => mudar('equipamento', b.dataset.equipamento); });
+    $$('[data-tipo-poste]', caixa).forEach((b) => { b.onclick = () => mudar('tipo_poste', b.dataset.tipoPoste); });
+    $$('[data-luminaria]', caixa).forEach((b) => { b.onclick = () => mudar('luminaria', b.dataset.luminaria); });
+  };
+  desenhar();
+}
 
 // ------------------------------------------------------------------
 // Minhas demandas
@@ -98,7 +146,10 @@ export async function telaCampo(el, { id }, ctx) {
       <button class="btn" id="b-rede">〰 Desenhar rede</button>
       <button class="btn primario" id="b-aqui">+ Ponto onde estou</button>
     </div>
-    <div class="campo-dica" id="dica">Toque no mapa para marcar um ponto.</div>
+    <div class="campo-esq">
+      <button class="chip-proximo" id="b-proximo" aria-label="Escolher poste e luminária do próximo ponto"></button>
+      <div class="campo-dica" id="dica">Toque no mapa para marcar um ponto.</div>
+    </div>
     <div id="ficha" class="ficha" hidden></div>
   </section>`;
   document.body.classList.add('modo-campo');
@@ -132,6 +183,22 @@ export async function telaCampo(el, { id }, ctx) {
   mapa.on('dragstart', () => { seguir = false; });
   $('#b-area', el).onclick = () => { seguir = false; enquadrar(); };
   $('#b-oficio', el).onclick = () => verOficio(tarefa);
+
+  // ---- poste e luminária do próximo ponto
+  const desenharProximo = () => {
+    const e = escolhaGuardada();
+    $('#b-proximo', el).innerHTML = `<small>Próximo ponto</small>${svgPoste(e.tipo_poste, 22)}<b>${nomePoste(e.tipo_poste)}</b>
+      ${svgLuminaria(e.luminaria, 12, e.equipamento)}<b>${EQUIPAMENTOS[e.equipamento]} ${nomeSituacao(e).toLowerCase()}</b><span class="chip-trocar">trocar</span>`;
+  };
+  desenharProximo();
+  $('#b-proximo', el).onclick = () => {
+    const { caixa, fechar } = abrirModal(`<h3>Próximo ponto</h3>
+      <p class="dica">Escolha antes de tocar no mapa. Fica marcado para os próximos pontos.</p>
+      <div id="m-escolha"></div>
+      <div class="linha-botoes"><button class="btn primario" id="m-ok">OK</button></div>`);
+    montarEscolha($('#m-escolha', caixa), escolhaGuardada(), (e) => { guardarEscolha(e); desenharProximo(); });
+    $('#m-ok', caixa).onclick = fechar;
+  };
 
   // ---- pontos: servidor + o que ainda está na fila do celular
   const simbolos = new Map();
@@ -389,7 +456,7 @@ export async function telaCampo(el, { id }, ctx) {
     ficha.innerHTML = `
       <div class="ficha-alca"></div>
       <div class="ficha-topo">
-        <label class="ficha-titulo" title="Número da plaqueta">${svgSimbolo(18)}
+        <label class="ficha-titulo" title="Número da plaqueta"><span id="f-icone">${svgSimbolo(18, p)}</span>
           <input id="f-plaqueta" class="ficha-plaqueta" maxlength="30" autocomplete="off" autocapitalize="characters"
             placeholder="Ponto ${numeroDo(p.id)} · nº plaqueta" value="${esc(p.plaqueta || '')}" aria-label="Número da plaqueta"></label>
         ${p.fora_da_area ? '<span class="selo selo-alerta">⚠ fora da área</span>' : ''}
@@ -406,21 +473,21 @@ export async function telaCampo(el, { id }, ctx) {
           <input id="f-rumo" type="number" inputmode="numeric" step="1" value="${Math.round(p.rotacao)}">
           <button type="button" data-r="15">⟳</button></div></label>
       </div>
+      <div class="ficha-escolha"></div>
       <div class="ficha-poste">
         <div class="poste-topo">
-          <label for="f-poste">Poste <small>altura/esforço · ex.: 11/300</small></label>
+          <label for="f-poste" id="f-poste-rotulo">Poste <small>altura/esforço · ex.: 11/300</small></label>
           <div class="qtd-lum">
-            <span>Luminárias</span>
+            <span id="f-qtd-rotulo">Luminárias</span>
             <div class="passo passo-qtd"><button type="button" data-q="-1" aria-label="Menos uma luminária">−</button>
             <input id="f-qtd" type="number" inputmode="numeric" min="0" max="4" step="1" value="${Math.min(4, p.qtd_luminarias ?? 1)}" aria-label="Quantidade de luminárias">
             <button type="button" data-q="1" aria-label="Mais uma luminária">+</button></div>
           </div>
         </div>
-        <div class="poste-linha">
+        <div class="poste-linha" id="f-poste-linha">
           <input id="f-poste" type="text" inputmode="decimal" maxlength="20" autocomplete="off" placeholder="11/300" value="${esc(p.poste || '')}">
           <button type="button" id="f-barra" aria-label="Inserir barra">/</button>
         </div>
-        <div class="poste-atalhos">${['9/150', '10/150', '11/200', '11/300', '12/300', '12/400', '13/600'].map((v) => `<button type="button" data-poste="${v}" aria-pressed="${p.poste === v}">${v}</button>`).join('')}</div>
       </div>
       <label class="ficha-obs">Observações
         <textarea id="f-obs" rows="3" placeholder="Ex.: luminária apagada, braço torto, poste de concreto…">${esc(p.observacoes || '')}</textarea></label>
@@ -471,10 +538,8 @@ export async function telaCampo(el, { id }, ctx) {
     $$('[data-q]', ficha).forEach((b) => { b.onclick = () => guardarQtd((s.ponto.qtd_luminarias ?? 1) + Number(b.dataset.q)); });
     const campoPoste = $('#f-poste', ficha);
     let tPoste;
-    const marcarAtalho = () => $$('[data-poste]', ficha).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.poste === campoPoste.value.trim())));
     const guardarPoste = (imediato) => {
       s.ponto.poste = campoPoste.value.trim();
-      marcarAtalho();
       clearTimeout(tPoste);
       if (imediato) salvarPonto(s.ponto); else tPoste = setTimeout(() => salvarPonto(s.ponto), 800);
     };
@@ -490,9 +555,24 @@ export async function telaCampo(el, { id }, ctx) {
       campoPoste.focus();
       guardarPoste(false);
     };
-    $$('[data-poste]', ficha).forEach((b) => {
-      b.onclick = () => { campoPoste.value = b.dataset.poste; guardarPoste(true); };
+    const ajustarRotulos = () => {
+      const proj = equipamento(s.ponto) === 'projetor';
+      $('#f-qtd-rotulo', ficha).textContent = proj ? 'Projetores' : 'Luminárias';
+      const semPoste = tipoPoste(s.ponto) === SEM_POSTE;
+      $('#f-poste-rotulo', ficha).style.visibility = semPoste ? 'hidden' : '';
+      $('#f-poste-linha', ficha).hidden = semPoste;
+    };
+    montarEscolha($('.ficha-escolha', ficha), {
+      equipamento: equipamento(p), tipo_poste: tipoPoste(p), luminaria: situacaoLuminaria(p),
+    }, (e) => {
+      s.atualizar(e); // redesenha o símbolo no mapa
+      guardarEscolha(e); // e vale para os próximos pontos
+      desenharProximo();
+      $('#f-icone', ficha).innerHTML = svgSimbolo(18, s.ponto);
+      ajustarRotulos();
+      salvarPonto(s.ponto);
     });
+    ajustarRotulos();
     let tPlaq;
     $('#f-plaqueta', ficha).oninput = (e) => {
       s.ponto.plaqueta = e.target.value;
@@ -631,6 +711,7 @@ export async function telaCampo(el, { id }, ctx) {
       rotacao: 90,
       plaqueta: '',
       poste: '',
+      ...escolhaGuardada(),
       qtd_luminarias: 1,
       observacoes: '',
       fora_da_area: false,

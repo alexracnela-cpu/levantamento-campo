@@ -232,12 +232,15 @@ body.modo-campo .topo { display: none; }
   display: grid; gap: 10px; justify-items: end; transition: bottom .2s;
 }
 .campo-acoes .btn.primario { min-height: 48px; box-shadow: var(--sombra); border-radius: 24px; padding: 0 18px; }
+.campo-esq {
+  position: absolute; z-index: 600; left: 10px; bottom: calc(46px + env(safe-area-inset-bottom)); max-width: calc(100% - 200px);
+  display: grid; gap: 8px; justify-items: start;
+}
 .campo-dica {
-  position: absolute; z-index: 600; left: 10px; bottom: calc(46px + env(safe-area-inset-bottom)); max-width: calc(100% - 210px);
   background: var(--vidro); border-radius: 8px; padding: 6px 10px; font-size: .82rem; box-shadow: var(--sombra);
 }
 .campo-dica.alerta { background: #fde7cf; color: #9a4a00; font-weight: 600; }
-.tela-campo.com-ficha .campo-acoes, .tela-campo.com-ficha .campo-dica { display: none; }
+.tela-campo.com-ficha .campo-acoes, .tela-campo.com-ficha .campo-esq { display: none; }
 
 .ficha {
   position: absolute; z-index: 700; left: 0; right: 0; bottom: 0; max-height: 62%; overflow-y: auto;
@@ -556,9 +559,6 @@ body.modo-campo .aviso.mostrar { transform: translate(-50%, 0); }
 .poste-linha { display: grid; grid-template-columns: 1fr 52px; }
 .poste-linha input { border-radius: var(--raio) 0 0 var(--raio); font: 700 1.15rem var(--corpo); letter-spacing: .5px; }
 .poste-linha button { border: 1.5px solid var(--tinta); border-radius: 0 var(--raio) var(--raio) 0; background: var(--tinta-clara); color: var(--tinta); font: 700 1.5rem var(--corpo); cursor: pointer; }
-.poste-atalhos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.poste-atalhos button { border: 1px solid var(--linha); background: var(--superficie); color: var(--tinta); border-radius: 16px; padding: 5px 11px; font: 600 .85rem var(--corpo); cursor: pointer; }
-.poste-atalhos button[aria-pressed=true] { background: var(--marinho); border-color: var(--marinho); color: #fff; }
 
 /* quantidade de luminárias (ao lado do título Poste) */
 .poste-topo { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; margin-bottom: 5px; }
@@ -566,3 +566,27 @@ body.modo-campo .aviso.mostrar { transform: translate(-50%, 0); }
 .qtd-lum { display: grid; gap: 4px; justify-items: end; font-weight: 600; font-size: .9rem; color: var(--tinta); }
 .passo-qtd { grid-template-columns: 38px 46px 38px; }
 .passo-qtd input { padding: 7px 2px; }
+
+/* tipo de poste e luminária (próximo ponto e ficha) */
+.chip-proximo {
+  display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 8px; text-align: left;
+  background: var(--cartao); color: var(--tinta); border: 1.5px solid var(--tinta); border-radius: 14px;
+  padding: 6px 10px; box-shadow: var(--sombra); font: 600 .82rem var(--corpo); cursor: pointer; max-width: 100%;
+}
+.chip-proximo small { grid-column: 1 / -1; color: var(--suave); font-weight: 600; font-size: .7rem; text-transform: uppercase; letter-spacing: .4px; }
+.chip-proximo svg { justify-self: center; }
+.chip-proximo b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip-proximo .chip-trocar { grid-column: 1 / -1; color: var(--tinta-2, var(--tinta)); font-size: .72rem; text-decoration: underline; }
+.escolha-poste { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 8px 0 4px; }
+.escolha-poste.com-sem-poste { grid-template-columns: repeat(3, 1fr); }
+.escolha-eq { margin-top: 0; }
+.escolha-poste button {
+  display: grid; justify-items: center; gap: 4px; padding: 8px 2px 6px; border: 1.5px solid var(--linha); border-radius: var(--raio);
+  background: #fff; color: #1b2a44; font: 600 .7rem/1.15 var(--corpo); cursor: pointer; text-align: center;
+}
+.escolha-poste button[aria-pressed=true] { border-color: var(--marinho); box-shadow: 0 0 0 2px var(--marinho); background: #e8f0fb; }
+.escolha-eq button, .escolha-lum button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.escolha-eq button svg, .escolha-lum button svg { background: #fff; border-radius: 4px; padding: 1px 2px; }
+.ficha-escolha { margin-top: 10px; }
+.ficha-titulo #f-icone { display: inline-flex; background: #fff; border-radius: 4px; }
+.tema-escuro .chip-proximo svg { background: #fff; border-radius: 4px; }

@@ -2,7 +2,9 @@
 
 import { api } from './api.js';
 import { criarMapa, desenharArea, DesenhoDeArea } from './mapa.js';
-import { SimboloNoMapa } from './simbolo.js';
+import {
+  SimboloNoMapa, tipoPoste, nomePoste, nomeSituacao, equipamento,
+} from './simbolo.js';
 import { montarRelatorio } from './relatorio.js';
 import {
   RedeNoMapa, TIPOS, SITUACOES, svgLinha, legendaRede, metragemRede, formatarMetros,
@@ -381,7 +383,7 @@ export async function telaTarefaLider(el, { id }, ctx) {
         <div class="lp-topo"><b>${p.plaqueta ? `Plaqueta ${esc(p.plaqueta)}` : `Ponto ${i + 1}`}</b>
           ${p.fora_da_area ? '<span class="selo selo-alerta">fora da área</span>' : ''}
           <span class="lp-hora">${horaBR(p.criado_em)}</span></div>
-        <div class="lp-meta">${p.poste ? `Poste <b>${esc(p.poste)}</b> · ` : ''}<b>${p.qtd_luminarias ?? 1}</b> lum. · ${String(p.tamanho_m).replace('.', ',')} m · rumo ${Math.round(p.rotacao)}°</div>
+        <div class="lp-meta">${nomePoste(tipoPoste(p))}${p.poste ? ` <b>${esc(p.poste)}</b>` : ''} · <b>${p.qtd_luminarias ?? 1}</b> ${equipamento(p) === 'projetor' ? 'proj.' : 'lum.'} ${nomeSituacao(p).toLowerCase()} · ${String(p.tamanho_m).replace('.', ',')} m · rumo ${Math.round(p.rotacao)}°</div>
         ${p.observacoes ? `<p class="lp-obs">${esc(p.observacoes)}</p>` : ''}
         ${fs.length ? `<div class="miniaturas">${fs.map((f) => (urls[f.path]
     ? `<img src="${urls[f.path]}" data-grande="${urls[f.path]}" alt="Foto do ponto ${i + 1}" loading="lazy">`

@@ -2,6 +2,7 @@
 
 import { sb } from './api.js';
 import { local } from './store.js';
+import { tipoPoste, situacaoLuminaria, equipamento } from './simbolo.js';
 
 const ouvintes = new Set();
 let rodando = false;
@@ -36,6 +37,9 @@ export async function salvarPonto(ponto) {
     plaqueta: (ponto.plaqueta || '').trim(),
     poste: (ponto.poste || '').trim(),
     qtd_luminarias: Number.isFinite(ponto.qtd_luminarias) ? ponto.qtd_luminarias : 1,
+    equipamento: equipamento(ponto),
+    tipo_poste: tipoPoste(ponto),
+    luminaria: situacaoLuminaria(ponto),
     observacoes: ponto.observacoes || '',
     fora_da_area: !!ponto.fora_da_area,
   };
