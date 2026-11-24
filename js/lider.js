@@ -244,6 +244,7 @@ export async function telaTarefaLider(el, { id }, ctx) {
       <h2 id="titulo"></h2>
       <p id="descricao" class="descricao"></p>
       <div id="entrega"></div>
+      ${tarefa.arquivada_em ? `<p class="aviso-arquivada">🗄 Fotos e ofício foram baixados no pacote e apagados do servidor em ${horaBR(tarefa.arquivada_em)}. Veja em <a href="#/banco">Banco de dados</a>.</p>` : ''}
       <div class="grade-campos">
         <label>Status<select id="status">${Object.entries(STATUS).map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select></label>
         <label>Prazo<input type="date" id="prazo"></label>

@@ -1,7 +1,7 @@
 // Service worker do RondaLuz: app funciona sem internet e guarda os pedaços de mapa já vistos.
 // Ao mudar qualquer arquivo do app, aumente a VERSAO para os celulares baixarem a nova.
 
-const VERSAO = 'v27';
+const VERSAO = 'v30';
 const APP = `rondaluz-app-${VERSAO}`;
 const MAPAS = 'rondaluz-mapas';
 const MAX_PEDACOS = 4000;
@@ -32,6 +32,8 @@ const ARQUIVOS = [
   './js/relatorio.js',
   './js/avisos.js',
   './js/tema.js',
+  './js/banco.js',
+  './js/zip.js',
 ];
 const EXTERNOS = [
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
@@ -136,5 +138,27 @@ self.addEventListener('notificationclick', (e) => {
       }
     }
     await self.clients.openWindow(self.registration.scope + href);
+  })());
+});
+
+// Notificação push (chega mesmo com o app fechado). Mandada pela função "avisar" do Supabase.
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { titulo: 'RondaLuz', texto: e.data ? e.data.text() : '' }; }
+  const titulo = d.titulo || 'RondaLuz';
+  const href = d.href || '';
+  e.waitUntil((async () => {
+    // Se o app está aberto e na frente, o popup de dentro do app já avisa.
+    const janelas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    if (janelas.some((j) => j.visibilityState === 'visible' && j.focused)) return;
+    await self.registration.showNotification(titulo, {
+      body: d.texto || '',
+      icon: 'icones/icone-192.png',
+      badge: 'icones/icone-192.png',
+      tag: href || titulo,
+      renotify: true,
+      vibrate: [200, 100, 200],
+      data: { href },
+    });
   })());
 });

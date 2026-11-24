@@ -24,7 +24,17 @@ export const api = {
   criarConta: (nome, email, senha) => sb.auth.signUp({
     email, password: senha, options: { data: { nome } },
   }).then(ok),
-  sair: () => sb.auth.signOut(),
+  async sair() {
+    // tira este aparelho da lista de avisos antes de sair (outra pessoa pode entrar nele)
+    try {
+      const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+      const insc = reg && reg.pushManager && await reg.pushManager.getSubscription();
+      if (insc) await sb.from('push_inscricoes').delete().eq('endpoint', insc.endpoint);
+    } catch { /* sem internet: a função apaga inscrições velhas sozinha */ }
+    return sb.auth.signOut();
+  },
+  registrarPush: (endpoint, p256dh, auth) =>
+    sb.rpc('registrar_push', { p_endpoint: endpoint, p_p256dh: p256dh, p_auth: auth }).then(ok),
 
   // ---- motoqueiro: RE + PIN
   consultarRe: (re) => sb.rpc('consultar_re', { p_re: re }).then(ok),
@@ -92,21 +102,53 @@ export const api = {
     } catch { /* arquivos órfãos não impedem a exclusão */ }
   },
 
+  // ---- uso do banco e limpeza (só líder)
+  usoBanco: () => sb.rpc('uso_banco').then(ok),
+  arquivosDaTarefa: (tarefaId) => sb.rpc('arquivos_da_tarefa', { t: tarefaId }).then(ok),
+  arquivosOrfaos: () => sb.rpc('arquivos_orfaos').then(ok),
+  baixarArquivo: (bucket, path) => sb.storage.from(bucket).download(path).then(ok),
+  async removerArquivos(bucket, paths) {
+    for (let i = 0; i < paths.length; i += 100) ok(await sb.storage.from(bucket).remove(paths.slice(i, i + 100)));
+  },
+  apagarFotosDaTarefa: (tarefaId) => sb.from('fotos').delete().eq('tarefa_id', tarefaId).then(ok),
+
   // ---- tempo real
   // Cada chamada abre um canal com nome único: o supabase-js reaproveita canais de mesmo nome,
   // e reabrir uma tela antes de o canal anterior fechar dava erro.
   ouvir(nome, tabelas, aoMudar) {
     let canal = null;
-    try {
-      canal = sb.channel(`${nome}-${Math.random().toString(36).slice(2, 10)}`);
-      tabelas.forEach(({ tabela, filtro }) => {
-        canal.on('postgres_changes', { event: '*', schema: 'public', table: tabela, ...(filtro ? { filter: filtro } : {}) },
-          (p) => { try { aoMudar(tabela, p); } catch (e) { console.warn('Aviso ao vivo:', e); } });
-      });
-      canal.subscribe();
-    } catch (e) {
-      console.warn('Atualização ao vivo indisponível:', e);
-    }
-    return () => { if (canal) sb.removeChannel(canal).catch(() => {}); };
+    let parado = false;
+    let espera = null;
+    const abrir = () => {
+      try {
+        const este = sb.channel(`${nome}-${Math.random().toString(36).slice(2, 10)}`);
+        canal = este;
+        tabelas.forEach(({ tabela, filtro }) => {
+          este.on('postgres_changes', { event: '*', schema: 'public', table: tabela, ...(filtro ? { filter: filtro } : {}) },
+            (p) => { try { aoMudar(tabela, p); } catch (e) { console.warn('Aviso ao vivo:', e); } });
+        });
+        este.subscribe((status, erro) => {
+          if (parado || canal !== este) return;
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            console.warn(`Tempo real (${nome}) caiu: ${status}`, erro || '');
+            // reabre sozinho depois de alguns segundos
+            clearTimeout(espera);
+            espera = setTimeout(() => {
+              if (parado) return;
+              sb.removeChannel(este).catch(() => {});
+              abrir();
+            }, 5000);
+          }
+        });
+      } catch (e) {
+        console.warn('Atualização ao vivo indisponível:', e);
+      }
+    };
+    abrir();
+    return () => {
+      parado = true;
+      clearTimeout(espera);
+      if (canal) sb.removeChannel(canal).catch(() => {});
+    };
   },
 };

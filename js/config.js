@@ -4,4 +4,6 @@
 window.RONDALUZ_CONFIG = {
   SUPABASE_URL: 'https://cpbavsbaqmggsuxsvjse.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_13WwPlDjG-gf29Kga7X5AA_cD-eJNAK',
+  // Chave PÚBLICA das notificações push (a privada fica só nos segredos da função "avisar").
+  VAPID_PUBLICA: 'BNDmrAHb-2Cem7CixZABmV4TL7U0sJxUDZ3iQMUjoSeGV5jiZ_ibx2lL4dblNBP7VNPHQ0-sUWt1rIQVgPw1jqY',
 };

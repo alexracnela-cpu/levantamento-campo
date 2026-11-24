@@ -5,6 +5,7 @@ import { local } from './store.js';
 import { iniciarSincronizacao, aoMudarFila, sincronizar, estadoFila } from './sync.js';
 import { telaPainel, telaNovaTarefa, telaTarefaLider, telaEquipe } from './lider.js';
 import { telaMinhas, telaCampo } from './motoqueiro.js';
+import { telaBanco } from './banco.js';
 import { $, esc, aviso, mensagemErro } from './util.js';
 import { iniciarAvisos, podePedirPermissao, pedirPermissao } from './avisos.js';
 import { aplicarTema, botaoTema, ligarBotoesTema } from './tema.js';
@@ -21,6 +22,7 @@ const ROTAS = {
     [/^#\/nova$/, telaNovaTarefa],
     [/^#\/tarefa\/([\w-]+)$/, telaTarefaLider, ['id']],
     [/^#\/equipe$/, telaEquipe],
+    [/^#\/banco$/, telaBanco],
     [/^#\/minhas$/, telaMinhas],
     [/^#\/campo\/([\w-]+)$/, telaCampo, ['id']],
   ],
@@ -69,7 +71,7 @@ function montarTopo() {
   topo.innerHTML = `
     <a class="marca" href="${INICIO[ctx.perfil.papel]}"><img src="icones/icone.svg" alt=""><span class="nome-marca">Ronda<b>Luz</b></span></a>
     <nav class="menu">
-      ${lider ? '<a href="#/painel" data-m="painel">Levantamentos</a><a href="#/equipe" data-m="equipe">Equipe</a><a href="#/minhas" data-m="minhas">Minhas demandas</a>'
+      ${lider ? '<a href="#/painel" data-m="painel">Levantamentos</a><a href="#/equipe" data-m="equipe">Equipe</a><a href="#/banco" data-m="banco">Banco de dados</a><a href="#/minhas" data-m="minhas">Minhas demandas</a>'
     : '<a href="#/minhas" data-m="minhas">Minhas demandas</a>'}
     </nav>
     <button id="b-avisos" class="sinc avisos-btn" title="Receber avisos neste aparelho" hidden>🔔 Ativar avisos</button>

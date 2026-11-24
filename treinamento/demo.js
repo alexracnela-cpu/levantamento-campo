@@ -134,10 +134,16 @@ async function semear() {
     redes: [
       { id: 'r-1', tarefa_id: t1, tipo: 'secundaria', situacao: 'existente', pontos: [em(-70, 11), em(35, -11)].map((p) => [...p]), observacoes: '', criado_por: UID.joao, criado_em: iso(25), atualizado_em: iso(25) },
     ],
-    fotos: [{ id: 'f-1', ponto_id: 'p-1', tarefa_id: t1, path: `${t1}/p-1/f-1.jpg`, criado_por: UID.joao, criado_em: iso(39) }],
+    fotos: [
+      { id: 'f-1', ponto_id: 'p-1', tarefa_id: t1, path: `${t1}/p-1/f-1.jpg`, criado_por: UID.joao, criado_em: iso(39) },
+      { id: 'f-q0', ponto_id: 'p-q0', tarefa_id: t3, path: `${t3}/p-q0/f-q0.jpg`, criado_por: UID.carla, criado_em: iso(2999) },
+      { id: 'f-q1', ponto_id: 'p-q1', tarefa_id: t3, path: `${t3}/p-q1/f-q1.jpg`, criado_por: UID.carla, criado_em: iso(2998) },
+    ],
   };
   DB.arquivos.set(`oficios/${t1}/oficio-0043-2026.png`, await gerarOficio());
   DB.arquivos.set(`fotos/${t1}/p-1/f-1.jpg`, await gerarFoto());
+  DB.arquivos.set(`fotos/${t3}/p-q0/f-q0.jpg`, await gerarFoto());
+  DB.arquivos.set(`fotos/${t3}/p-q1/f-q1.jpg`, await gerarFoto());
 }
 
 // ---------------------------------------------------------------------
@@ -331,6 +337,40 @@ function criarSb(inst) {
       if (!p?.re) return erro('Esta pessoa não entra por RE.');
       d.credenciais[p.re] = { pin: null, segredo: crypto.randomUUID(), tentativas: 0, bloqueadoAte: 0, zerado: true };
       return { data: null, error: null };
+    }
+    // uso do banco (tela Banco de dados do líder)
+    const arquivosGuardados = () => [...DB.arquivos.entries()].map(([k, b]) => {
+      const [bucket, ...resto] = k.split('/');
+      return { bucket, caminho: resto.join('/'), bytes: b.size || 0, criado_em: null, tarefa: resto[0] };
+    });
+    if (nome === 'uso_banco' || nome === 'arquivos_da_tarefa' || nome === 'arquivos_orfaos') {
+      if (papel() !== 'lider') return erro('Só o líder pode ver o uso do banco.');
+      const arqs = arquivosGuardados();
+      const existe = (tid) => d.tarefas.some((x) => x.id === tid);
+      if (nome === 'arquivos_da_tarefa') return { data: arqs.filter((a) => a.tarefa === args.t).map(({ tarefa, ...a }) => a), error: null };
+      if (nome === 'arquivos_orfaos') return { data: arqs.filter((a) => !existe(a.tarefa)).map(({ tarefa, criado_em, ...a }) => a), error: null };
+      const tam = (linhas) => 8192 + JSON.stringify(linhas).length * 3;
+      const soma = (l) => l.reduce((x, a) => x + a.bytes, 0);
+      const orf = arqs.filter((a) => !existe(a.tarefa));
+      const tabelas = ['convites', 'fotos', 'perfis', 'pontos', 'redes', 'tarefas'].map((n) => ({ tabela: n, linhas: d[n].length, bytes: tam(d[n]) }));
+      const demandas = d.tarefas.map((x) => {
+        const da = arqs.filter((a) => a.tarefa === x.id);
+        return {
+          id: x.id, titulo: x.titulo, status: x.status, criado_em: x.criado_em, finalizada_em: x.finalizada_em || null,
+          arquivada_em: x.arquivada_em || null, motoqueiro_id: x.motoqueiro_id,
+          pontos: d.pontos.filter((p) => p.tarefa_id === x.id).length, redes: d.redes.filter((r) => r.tarefa_id === x.id).length,
+          fotos: da.filter((a) => a.bucket === 'fotos').length,
+          fotos_bytes: soma(da.filter((a) => a.bucket === 'fotos')), oficio_bytes: soma(da.filter((a) => a.bucket === 'oficios')),
+        };
+      }).sort((a, b) => (b.fotos_bytes + b.oficio_bytes) - (a.fotos_bytes + a.oficio_bytes));
+      const porBalde = ['fotos', 'oficios'].map((b) => ({ bucket: b, qtd: arqs.filter((a) => a.bucket === b).length, bytes: soma(arqs.filter((a) => a.bucket === b)) })).filter((b) => b.qtd);
+      return {
+        data: {
+          banco_bytes: 24 * 1024 ** 2 + tabelas.reduce((x, tb) => x + tb.bytes, 0), tabelas, arquivos: porBalde,
+          orfaos: { qtd: orf.length, bytes: soma(orf) }, demandas,
+        },
+        error: null,
+      };
     }
     const t = DB.dados.tarefas.find((x) => x.id === args.t);
     if (!t) return { data: null, error: { message: 'Demanda não encontrada' } };

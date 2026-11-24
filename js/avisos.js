@@ -1,4 +1,5 @@
-// Avisos: popup dentro do app + notificação do sistema (quando a aba está em segundo plano).
+// Avisos: popup dentro do app + notificação do sistema (quando a aba está em segundo plano)
+// + notificação push (app fechado), mandada pela função "avisar" do Supabase (supabase/push.sql).
 //   Motoqueiro: novo levantamento para ele, levantamento devolvido pelo líder.
 //   Líder: motoqueiro terminou um levantamento.
 // Ao entrar, mostra um resumo do que chegou enquanto a pessoa estava fora.
@@ -60,7 +61,45 @@ export function podePedirPermissao() {
 }
 
 export async function pedirPermissao() {
-  try { return await Notification.requestPermission(); } catch { return 'denied'; }
+  let r = 'denied';
+  try { r = await Notification.requestPermission(); } catch { /* navegador sem suporte */ }
+  if (r === 'granted') ligarPush();
+  return r;
+}
+
+function chaveBytes(b64) {
+  const b = atob(b64.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (b64.length % 4)) % 4));
+  return Uint8Array.from(b, (c) => c.charCodeAt(0));
+}
+
+// Inscreve este aparelho para receber notificação push (aviso mesmo com o app fechado).
+// Roda ao entrar e ao liberar os avisos; se já estiver inscrito, só confirma no servidor.
+export async function ligarPush() {
+  try {
+    const chave = (window.RONDALUZ_CONFIG || {}).VAPID_PUBLICA;
+    if (!chave || typeof Notification === 'undefined' || Notification.permission !== 'granted') return false;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+    const reg = await navigator.serviceWorker.ready;
+    let insc = await reg.pushManager.getSubscription();
+    const chaveAtual = insc?.options?.applicationServerKey;
+    if (insc && chaveAtual && b64DeBuffer(chaveAtual) !== chave.replace(/=+$/, '')) {
+      await insc.unsubscribe(); // chave trocada: inscreve de novo
+      insc = null;
+    }
+    if (!insc) insc = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveBytes(chave) });
+    const j = insc.toJSON();
+    await api.registrarPush(j.endpoint, j.keys.p256dh, j.keys.auth);
+    return true;
+  } catch (e) {
+    console.warn('Push indisponível:', e);
+    return false;
+  }
+}
+
+function b64DeBuffer(buf) {
+  let s = '';
+  new Uint8Array(buf).forEach((b) => { s += String.fromCharCode(b); });
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 function vistas(uid) {
@@ -77,6 +116,7 @@ export async function iniciarAvisos(ctx) {
   let nomes = {};
 
   if (!navigator.onLine) return () => {};
+  ligarPush();
   try {
     const [tarefas, equipe] = await Promise.all([api.tarefas(), lider ? api.equipe() : Promise.resolve([])]);
     nomes = Object.fromEntries(equipe.map((m) => [m.id, m.nome || m.email]));
@@ -105,15 +145,15 @@ export async function iniciarAvisos(ctx) {
     }
   } catch { /* sem resumo; segue ouvindo */ }
 
-  // ao vivo
-  const parar = api.ouvir('avisos', [{ tabela: 'tarefas' }], (_tab, p) => {
-    const t = p.new;
-    if (!t || !t.id) { if (p.old?.id) estado.delete(p.old.id); return; }
+  // Trata uma demanda que chegou (tempo real ou conferência periódica) e avisa se mudou algo.
+  const processar = (t) => {
     const antes = estado.get(t.id);
     estado.set(t.id, { motoqueiro_id: t.motoqueiro_id, finalizada_em: t.finalizada_em, status: t.status, titulo: t.titulo });
 
     if (t.motoqueiro_id === eu.id && (!antes || antes.motoqueiro_id !== eu.id) && t.status !== 'concluido' && t.criado_por !== eu.id) {
-      const v = vistas(eu.id); v.add(t.id); guardarVistas(eu.id, v);
+      const v = vistas(eu.id);
+      if (v.has(t.id)) return;
+      v.add(t.id); guardarVistas(eu.id, v);
       avisar({ icone: '📋', titulo: 'Novo levantamento para você', texto: `${t.titulo}${t.prazo ? ` · prazo ${dataBR(t.prazo)}` : ''}`, href: `#/campo/${t.id}` });
       return;
     }
@@ -121,10 +161,39 @@ export async function iniciarAvisos(ctx) {
       avisar({ icone: '↩️', tipo: 'alerta', titulo: 'Levantamento devolvido pelo líder', texto: `${t.titulo} · confira e toque em Terminei de novo`, href: `#/campo/${t.id}` });
       return;
     }
-    if (lider && t.finalizada_em && !antes?.finalizada_em && t.status !== 'concluido') {
+    if (lider && antes && t.finalizada_em && !antes.finalizada_em && t.status !== 'concluido') {
       const quem = nomes[t.motoqueiro_id] || 'O motoqueiro';
       avisar({ icone: '✅', tipo: 'ok', titulo: `${quem} terminou um levantamento`, texto: t.titulo, href: `#/tarefa/${t.id}` });
     }
+  };
+
+  // ao vivo (pode falhar em silêncio: rede do celular, aba congelada, canal recusado)
+  const pararCanal = api.ouvir('avisos', [{ tabela: 'tarefas' }], (_tab, p) => {
+    const t = p.new;
+    if (!t || !t.id) { if (p.old?.id) estado.delete(p.old.id); return; }
+    processar(t);
   });
-  return parar;
+
+  // Conferência de segurança: busca as demandas de tempos em tempos e ao voltar para o app.
+  // Assim o aviso chega mesmo quando o tempo real cai.
+  let conferindo = false;
+  const conferir = async () => {
+    if (conferindo || !navigator.onLine) return;
+    conferindo = true;
+    try { (await api.tarefas()).forEach(processar); } catch { /* tenta na próxima */ }
+    conferindo = false;
+  };
+  const timer = setInterval(conferir, 30000);
+  const aoVoltar = () => { if (!document.hidden) conferir(); };
+  document.addEventListener('visibilitychange', aoVoltar);
+  window.addEventListener('online', conferir);
+  window.addEventListener('focus', conferir);
+
+  return () => {
+    pararCanal();
+    clearInterval(timer);
+    document.removeEventListener('visibilitychange', aoVoltar);
+    window.removeEventListener('online', conferir);
+    window.removeEventListener('focus', conferir);
+  };
 }
