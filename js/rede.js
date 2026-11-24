@@ -5,6 +5,18 @@ import { emMetros, deslocar } from './util.js';
 
 export const TIPOS = { secundaria: 'Secundária', primaria: 'Primária' };
 export const SITUACOES = { existente: 'Existente', inexistente: 'Inexistente' };
+// Tipo de rede (Multiplexado, Alumínio nu...; escolhido na ficha; vazio = não informado).
+// No banco a coluna se chama "cabo".
+export const CABOS = {
+  multiplexado: 'Multiplexado',
+  aluminio_nu: 'Alumínio nu',
+  cabo_pp: 'Cabo PP',
+  smc: 'SMC',
+  zero_bt: 'Zero BT',
+  blindada: 'Blindada',
+  concentrica: 'Concêntrica',
+};
+export const nomeCabo = (c) => CABOS[c] || '';
 export const CORES = { existente: '#1f6fd0', inexistente: '#e07b00' };
 const TRACEJADO = '14 9';
 

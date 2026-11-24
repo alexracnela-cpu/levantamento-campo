@@ -5,7 +5,7 @@
 import { api } from './api.js';
 import { montarRelatorio } from './relatorio.js';
 import { tipoPoste, nomePoste, equipamento, EQUIPAMENTOS, nomeSituacao } from './simbolo.js';
-import { comprimentoM, medidaInformada, TIPOS, SITUACOES } from './rede.js';
+import { comprimentoM, medidaInformada, TIPOS, SITUACOES, nomeCabo } from './rede.js';
 import { abrirModal, confirmar, seloStatus } from './comum.js';
 import { Zip, baixarBlob } from './zip.js';
 import {
@@ -113,8 +113,8 @@ async function adicionarDemanda(zip, tarefa, equipe, progresso) {
   ]));
   if (redes.length) {
     await zip.adicionar(`${pasta}/rede.csv`, csv([
-      ['Trecho', 'Tipo', 'Situação', 'Vértices', 'Comprimento no mapa (m)', 'Medida em campo (m)', 'Observações'],
-      ...redes.map((r, i) => [i + 1, TIPOS[r.tipo] || r.tipo, SITUACOES[r.situacao] || r.situacao, (r.pontos || []).length,
+      ['Trecho', 'Tipo', 'Situação', 'Rede', 'Vértices', 'Comprimento no mapa (m)', 'Medida em campo (m)', 'Observações'],
+      ...redes.map((r, i) => [i + 1, TIPOS[r.tipo] || r.tipo, SITUACOES[r.situacao] || r.situacao, nomeCabo(r.cabo), (r.pontos || []).length,
         num(comprimentoM(r.pontos), 1), num(medidaInformada(r), 1), r.observacoes]),
     ]));
   }

@@ -354,6 +354,11 @@ body.modo-campo .aviso.mostrar { transform: translate(-50%, 0); }
 }
 .seg button + button { border-left: 1.5px solid var(--tinta); }
 .seg button[aria-pressed=true] { background: var(--marinho); color: #fff; }
+.cabos { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0; }
+.cabos-rotulo { width: 100%; font-size: .85rem; font-weight: 600; }
+.cabos-rotulo small { font-weight: 400; opacity: .7; }
+.cabos button { flex: 1 1 calc(33% - 6px); min-height: 40px; padding: 6px 8px; border: 1.5px solid var(--tinta); border-radius: var(--raio); background: transparent; color: inherit; font: inherit; font-size: .9rem; cursor: pointer; }
+.cabos button[aria-pressed=true] { background: var(--marinho); color: #fff; border-color: var(--marinho); }
 .seg button i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 2px solid #fff; }
 .medida-rede { display: inline-flex; align-items: center; gap: 4px; font: 700 1rem var(--corpo); color: var(--suave); white-space: nowrap; margin-left: auto; }
 .medida-rede input {

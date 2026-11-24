@@ -7,7 +7,7 @@ import {
   equipamento, EQUIPAMENTOS,
 } from './simbolo.js';
 import {
-  comprimentoM, metragemRede, medidaInformada, formatarMetros, TIPOS, SITUACOES, CORES,
+  comprimentoM, metragemRede, medidaInformada, formatarMetros, TIPOS, SITUACOES, CORES, CABOS, nomeCabo,
 } from './rede.js';
 import {
   esc, dataBR, horaBR, diasComPessoa,
@@ -292,9 +292,10 @@ ${previa ? '<div class="marca-dagua">PRÉVIA</div>' : ''}
   </tbody></table>` : '<p class="sem-fotos">Nenhum ponto levantado.</p>'}
 
   <h2>Rede desenhada</h2>
-  ${redes.length ? `<table><thead><tr><th>Trecho</th><th>Tipo</th><th>Situação</th><th>Vértices</th><th>Comprimento</th></tr></thead><tbody>
-    ${redes.map((r, i) => `<tr><td>${linhaRede(r.tipo, r.situacao)} ${i + 1}</td><td>${TIPOS[r.tipo] || r.tipo}</td><td>${SITUACOES[r.situacao] || r.situacao}</td><td>${(r.pontos || []).length}</td><td>${medidaInformada(r) ? `${formatarMetros(medidaInformada(r))} <small>(medida em campo; mapa ${formatarMetros(comprimentoM(r.pontos))})</small>` : formatarMetros(comprimentoM(r.pontos))}</td></tr>`).join('')}
-    ${Object.entries(somas).map(([k, m]) => { const [t, sit] = k.split('|'); return `<tr><td colspan="4"><b>Total ${TIPOS[t].toLowerCase()} ${SITUACOES[sit].toLowerCase()}</b></td><td><b>${formatarMetros(m)}</b></td></tr>`; }).join('')}
+  ${redes.length ? `<table><thead><tr><th>Trecho</th><th>Tipo</th><th>Situação</th><th>Rede</th><th>Vértices</th><th>Comprimento</th></tr></thead><tbody>
+    ${redes.map((r, i) => `<tr><td>${linhaRede(r.tipo, r.situacao)} ${i + 1}</td><td>${TIPOS[r.tipo] || r.tipo}</td><td>${SITUACOES[r.situacao] || r.situacao}</td><td>${nomeCabo(r.cabo) || '—'}</td><td>${(r.pontos || []).length}</td><td>${medidaInformada(r) ? `${formatarMetros(medidaInformada(r))} <small>(medida em campo; mapa ${formatarMetros(comprimentoM(r.pontos))})</small>` : formatarMetros(comprimentoM(r.pontos))}</td></tr>`).join('')}
+    ${Object.entries(somas).map(([k, m]) => { const [t, sit] = k.split('|'); return `<tr><td colspan="5"><b>Total ${TIPOS[t].toLowerCase()} ${SITUACOES[sit].toLowerCase()}</b></td><td><b>${formatarMetros(m)}</b></td></tr>`; }).join('')}
+    ${Object.keys(CABOS).filter((c) => redes.some((r) => r.cabo === c)).map((c) => `<tr><td colspan="5">Total rede ${CABOS[c]}</td><td>${formatarMetros(redes.filter((r) => r.cabo === c).reduce((t, r) => t + metragemRede(r), 0))}</td></tr>`).join('')}
   </tbody></table>` : '<p class="sem-fotos">Nenhuma rede desenhada.</p>'}
 
   <h2>Fichas dos pontos</h2>

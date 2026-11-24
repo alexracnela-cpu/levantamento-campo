@@ -14,10 +14,11 @@ import {
   finalizarTarefa,
 } from './sync.js';
 import {
-  RedeNoMapa, TIPOS, SITUACOES, CORES, svgLinha, formatarMetros, metragemRede, medidaInformada,
+  RedeNoMapa, TIPOS, SITUACOES, CABOS, CORES, svgLinha, formatarMetros, metragemRede, medidaInformada,
 } from './rede.js';
 import {
   $, $$, esc, aviso, dataBR, prazoVencido, novoId, dentroDoPoligono, comprimirFoto, mensagemErro, diasComPessoa,
+  emMetros,
 } from './util.js';
 
 // ------------------------------------------------------------------
@@ -175,6 +176,21 @@ export async function telaCampo(el, { id }, ctx) {
     $('#dica', el).classList.toggle('alerta', !dentro);
   });
   gps.iniciar();
+
+  // Motoqueiro só marca ponto e rede até 100 m de onde está (pelo GPS). Líder não tem limite.
+  const LIMITE_M = 100;
+  const comLimite = ctx.perfil.papel !== 'lider';
+  const pertoDeMim = (lat, lng) => {
+    if (!comLimite) return true;
+    if (!gps.ultima) { aviso('Esperando o sinal do GPS. Só dá para marcar perto de onde você está.', 'erro'); return false; }
+    const [e, n] = emMetros(gps.ultima.latlng[0], gps.ultima.latlng[1], lat, lng);
+    const d = Math.hypot(e, n);
+    if (d > LIMITE_M) {
+      aviso(`Você está a ${Math.round(d)} m deste lugar. Só dá para marcar até ${LIMITE_M} m de onde você está.`, 'erro');
+      return false;
+    }
+    return true;
+  };
   $('#b-gps', el).onclick = () => {
     if (!gps.ultima) { aviso('Ainda sem posição do GPS.'); return; }
     seguir = true;
@@ -254,6 +270,8 @@ export async function telaCampo(el, { id }, ctx) {
     $('#campo-contagem', el).textContent = `${simbolos.size} ponto(s)${redes.size ? ` · ${formatarMetros(metros)} de rede` : ''}`;
   };
 
+  const pontosBons = new Map(); // rede id -> pontos aceitos (para desfazer arrasto longe demais)
+  const guardarPontosBons = (rd) => pontosBons.set(rd.rede.id, rd.rede.pontos.map((p) => [...p]));
   const criarRede = (r) => {
     const rd = new RedeNoMapa(mapa, r, {
       editavel: true,
@@ -269,13 +287,26 @@ export async function telaCampo(el, { id }, ctx) {
         alvo.desenhar();
         renderFicha();
       },
-      aoMudar: (alvo) => { salvarRede(alvo.rede); atualizarResumo(); if (redeSel === alvo) renderFicha(); },
+      aoMudar: (alvo) => {
+        // ponto do cabo arrastado para longe demais: volta para onde estava
+        const antes = pontosBons.get(alvo.rede.id) || [];
+        const longe = alvo.rede.pontos.some((p, i) => (!antes[i] || antes[i][0] !== p[0] || antes[i][1] !== p[1]) && !pertoDeMim(p[0], p[1]));
+        if (longe) {
+          alvo.rede.pontos = antes.slice(0, alvo.rede.pontos.length).map((p) => [...p]);
+          alvo.desenhar();
+          return;
+        }
+        guardarPontosBons(alvo);
+        salvarRede(alvo.rede); atualizarResumo(); if (redeSel === alvo) renderFicha();
+      },
     });
     redes.set(r.id, rd);
+    guardarPontosBons(rd);
     return rd;
   };
   (await carregarRedes()).forEach(criarRede);
 
+  const posicaoBoa = new Map(); // ponto id -> última posição aceita
   const criarSimbolo = (p) => {
     const s = new SimboloNoMapa(mapa, p, {
       editavel: true,
@@ -284,9 +315,20 @@ export async function telaCampo(el, { id }, ctx) {
         selecionar(simb);
       },
       aoMudar: (simb) => preencherNumeros(simb),
-      aoSoltar: (simb) => gravar(simb, true),
+      aoSoltar: (simb) => {
+        const antes = posicaoBoa.get(simb.ponto.id);
+        const moveu = !antes || antes[0] !== simb.ponto.lat || antes[1] !== simb.ponto.lng;
+        if (moveu && !pertoDeMim(simb.ponto.lat, simb.ponto.lng)) {
+          simb.atualizar({ lat: antes[0], lng: antes[1] }); // volta para onde estava
+          preencherNumeros(simb);
+          return;
+        }
+        posicaoBoa.set(simb.ponto.id, [simb.ponto.lat, simb.ponto.lng]);
+        gravar(simb, true);
+      },
     });
     simbolos.set(p.id, s);
+    posicaoBoa.set(p.id, [p.lat, p.lng]);
     return s;
   };
 
@@ -359,12 +401,9 @@ export async function telaCampo(el, { id }, ctx) {
       ? (r.pontos.length
         ? 'Toque no próximo poste ou ponto do mapa. Tocar num poste encaixa a rede no centro dele.'
         : 'Toque no poste (ou ponto do mapa) onde a rede começa.')
-      : 'Arraste os quadradinhos ou use as setas para ajustar o traçado.';
+      : 'Arraste os quadradinhos para ajustar o traçado.';
     const informada = medidaInformada(r);
     const doMapa = rd.comprimento;
-    const nPts = r.pontos.length;
-    const ativo = rd.indiceAtivo;
-    const passo = Number(localStorage.getItem('rondaluz-passo-cabo')) || 0.5;
     ficha.innerHTML = `
       <div class="ficha-alca"></div>
       <div class="ficha-topo">
@@ -377,25 +416,15 @@ export async function telaCampo(el, { id }, ctx) {
       </div>
       ${informada ? `<p class="ficha-dica medida-mapa">✎ Medida digitada · no mapa: ${formatarMetros(doMapa)} <button type="button" class="link" id="r-usar-mapa">usar a do mapa</button></p>` : ''}
       <p class="ficha-dica">${dica}</p>
-      ${nPts ? `<div class="ajuste-cabo">
-        <div class="ajuste-rotulo"><b>Mover ponto ${ativo + 1} de ${nPts}</b>
-          <span>${nPts > 1 ? 'Só este ponto se mexe. Toque num quadradinho para trocar.' : 'Só este ponto se mexe.'}</span>
-          <div class="passos" role="group" aria-label="Passo">
-            ${[0.5, 1, 5].map((v) => `<button type="button" data-passo="${v}" aria-pressed="${passo === v}">${String(v).replace('.', ',')} m</button>`).join('')}
-          </div>
-        </div>
-        <div class="setas" role="group" aria-label="Mover ponto">
-          <button type="button" data-mover="0,1" aria-label="Mover para o norte">▲</button>
-          <button type="button" data-mover="-1,0" aria-label="Mover para o oeste">◀</button>
-          <button type="button" data-mover="1,0" aria-label="Mover para o leste">▶</button>
-          <button type="button" data-mover="0,-1" aria-label="Mover para o sul">▼</button>
-        </div>
-      </div>` : ''}
       <div class="seg" role="group" aria-label="Tipo de rede">
         ${Object.entries(TIPOS).map(([v, t]) => `<button type="button" data-tipo="${v}" aria-pressed="${r.tipo === v}">${svgLinha(v, r.situacao, 28)} ${t}</button>`).join('')}
       </div>
       <div class="seg" role="group" aria-label="Situação da rede">
         ${Object.entries(SITUACOES).map(([v, t]) => `<button type="button" data-situacao="${v}" aria-pressed="${r.situacao === v}"><i style="background:${CORES[v]}"></i> ${t}</button>`).join('')}
+      </div>
+      <div class="cabos" role="group" aria-label="Tipo de rede">
+        <span class="cabos-rotulo">Tipo de rede${r.cabo ? '' : ' <small>(escolha um)</small>'}</span>
+        ${Object.entries(CABOS).map(([v, t]) => `<button type="button" data-cabo="${v}" aria-pressed="${r.cabo === v}">${t}</button>`).join('')}
       </div>
       <div class="linha-botoes">
         ${desenhando
@@ -414,19 +443,11 @@ export async function telaCampo(el, { id }, ctx) {
     $('#r-metros', ficha).onfocus = (e) => e.target.select();
     const usarMapa = $('#r-usar-mapa', ficha);
     if (usarMapa) usarMapa.onclick = () => { rd.atualizar({ comprimento_informado: null }); salvarSeValida(); renderFicha(); };
-    $$('[data-passo]', ficha).forEach((b) => {
-      b.onclick = () => { localStorage.setItem('rondaluz-passo-cabo', b.dataset.passo); renderFicha(); };
-    });
-    $$('[data-mover]', ficha).forEach((b) => {
-      b.onclick = () => {
-        const [e, n] = b.dataset.mover.split(',').map(Number);
-        rd.moverVertice(rd.indiceAtivo, e * passo, n * passo);
-        salvarSeValida();
-        renderFicha();
-      };
-    });
     $$('[data-tipo]', ficha).forEach((b) => {
       b.onclick = () => { rd.atualizar({ tipo: b.dataset.tipo }); localStorage.setItem('rondaluz-rede-tipo', b.dataset.tipo); salvarSeValida(); renderFicha(); };
+    });
+    $$('[data-cabo]', ficha).forEach((b) => {
+      b.onclick = () => { rd.atualizar({ cabo: b.dataset.cabo }); localStorage.setItem('rondaluz-rede-cabo', b.dataset.cabo); salvarSeValida(); renderFicha(); };
     });
     $$('[data-situacao]', ficha).forEach((b) => {
       b.onclick = () => { rd.atualizar({ situacao: b.dataset.situacao }); localStorage.setItem('rondaluz-rede-situacao', b.dataset.situacao); salvarSeValida(); renderFicha(); };
@@ -646,7 +667,9 @@ export async function telaCampo(el, { id }, ctx) {
 
   function adicionarVertice(ll) {
     if (!redeSel) return;
+    if (!pertoDeMim(ll[0], ll[1])) return;
     redeSel.adicionarVertice(ll);
+    guardarPontosBons(redeSel);
     if (redeSel.rede.pontos.length >= 2) salvarRede(redeSel.rede);
     atualizarResumo();
     renderFicha();
@@ -659,6 +682,7 @@ export async function telaCampo(el, { id }, ctx) {
       tarefa_id: id,
       tipo: localStorage.getItem('rondaluz-rede-tipo') || 'secundaria',
       situacao: localStorage.getItem('rondaluz-rede-situacao') || 'existente',
+      ...(CABOS[localStorage.getItem('rondaluz-rede-cabo')] ? { cabo: localStorage.getItem('rondaluz-rede-cabo') } : {}),
       pontos: [],
       observacoes: '',
     };
@@ -727,6 +751,7 @@ export async function telaCampo(el, { id }, ctx) {
     if (desenhando) { adicionarVertice([e.latlng.lat, e.latlng.lng]); return; }
     if (redeSel) { selecionarRede(null); return; }
     if (selecionado) { selecionar(null); return; }
+    if (!pertoDeMim(e.latlng.lat, e.latlng.lng)) return;
     novoPonto(e.latlng.lat, e.latlng.lng);
   });
   $('#b-rede', el).onclick = () => iniciarRede();

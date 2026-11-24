@@ -865,3 +865,12 @@ drop trigger if exists tarefas_avisar_push on public.tarefas;
 create trigger tarefas_avisar_push
   after insert or update of motoqueiro_id, finalizada_em on public.tarefas
   for each row execute function public.avisar_push_tarefa();
+
+-- =====================================================================
+-- (incluído de supabase/rede-cabo.sql)
+alter table public.redes add column if not exists cabo text;
+alter table public.redes drop constraint if exists redes_cabo_valido;
+alter table public.redes add constraint redes_cabo_valido check (
+  cabo is null or cabo in ('multiplexado', 'aluminio_nu', 'cabo_pp', 'smc', 'zero_bt', 'blindada', 'concentrica')
+);
+notify pgrst, 'reload schema';
