@@ -5,6 +5,16 @@ HTML/CSS/JS sem build, Leaflet, Supabase (RLS), publicado pelo GitHub Pages a ca
 (https://alexracnela-cpu.github.io/levantamento-campo/; conferir a VERSAO em .../sw.js).
 Interface e textos sempre em português.
 
+## ⚠ Produção é o servidor próprio (desde 25/11/2026), não o Supabase
+- O RondaLuz roda no mao-srv-fleet (`/data/rondaluz`, https://rondaluz.manausluz.com.br): Postgres + PostgREST + api Node
+  que imita o Supabase. **Sem tempo real** (`api.ouvir` confere a cada 20 s). O GitHub Pages deste repositório ainda aponta
+  para o Supabase antigo e não é mais produção.
+- O código do servidor fica no PC do usuário (`Downloads\Flui-Rondaluz\rondaluz\`). Para publicar: montar um zip
+  `rondaluz-vX.Y.Z.zip` a partir do anterior, copiando daqui `js/*.js` (menos `api.js`) e `css/app.css` para `web/site/`;
+  no `web/site/js/api.js` e no `web/site/sw.js` do servidor só acrescentar o que mudou (rotas novas, VERSAO, ARQUIVOS).
+  Banco: `.sql` numerado em `sql-projeto/` (idempotente, sem `supabase_realtime`, termina com conferência) + `NOTA-vX.Y.Z.md`.
+- Scripts inline do relatório e do tema têm hash na CSP do servidor (`web/seguranca.conf`): mudou, recalcule.
+
 ## Toda mudança no app vale também para o treinamento (regra do usuário)
 Depois de qualquer alteração em `js/`, `css/` ou `icones/`:
 1. Ajuste o simulador se precisar (`treinamento/demo.js`: dados de exemplo e o Supabase de mentira;
