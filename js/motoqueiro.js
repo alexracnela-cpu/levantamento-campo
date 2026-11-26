@@ -71,25 +71,51 @@ function montarEscolha(caixa, inicial, aoEscolher) {
 // Minhas demandas
 // ------------------------------------------------------------------
 export async function telaMinhas(el, _p, ctx) {
+  let aba = 'fazer';
+  try { aba = sessionStorage.getItem('rondaluz-aba-minhas') || 'fazer'; } catch { /* sem armazenamento */ }
   el.innerHTML = `<section class="pagina">
     <div class="cabecalho-pagina"><h1>Minhas demandas</h1></div>
+    <div class="abas" role="tablist">
+      <button class="aba" data-a="fazer" role="tab">A fazer <small class="aba-n"></small></button>
+      <button class="aba" data-a="concluidas" role="tab">Concluídas <small class="aba-n"></small></button>
+    </div>
     <div id="lista" class="lista-tarefas"><p class="vazio">Carregando…</p></div>
   </section>`;
 
   const k = `tarefas:${ctx.perfil.id}`;
-  const render = (tarefas, offline) => {
-    const ordem = { em_andamento: 0, pendente: 1, concluido: 2 };
-    tarefas.sort((a, b) => (ordem[a.status] - ordem[b.status]) || String(a.prazo || '9').localeCompare(String(b.prazo || '9')));
-    $('#lista', el).innerHTML = (offline ? '<p class="dica">Sem internet: mostrando a última lista guardada.</p>' : '')
-      + (tarefas.length ? tarefas.map((t) => `
+  let ultima = { tarefas: [], offline: false };
+  const cartao = (t) => `
       <a class="cartao-tarefa" href="#/campo/${t.id}">
-        <div class="ct-topo">${seloStatus(t.status)}${t.finalizada_em ? ' <span class="selo selo-entregue">✓ entregue</span>' : ''}</div>
+        <div class="ct-topo">${seloStatus(t.status)}${t.finalizada_em && t.status !== 'concluido' ? ' <span class="selo selo-entregue">✓ entregue · aguardando o líder</span>' : ''}</div>
         <h3>${esc(t.titulo)}</h3>
         ${t.descricao ? `<p class="ct-desc">${esc(t.descricao)}</p>` : ''}
         <p class="ct-meta ${prazoVencido(t.prazo, t.status) ? 'vencido' : ''}">Prazo: ${dataBR(t.prazo)}${t.oficio_path ? ' · 📄 ofício' : ''}</p>
-        ${(() => { const d = diasComPessoa(t); return d ? `<p class="ct-meta">📅 Com você ${d.texto}</p>` : ''; })()}
-      </a>`).join('') : '<p class="vazio">Nenhuma demanda para você no momento.</p>');
+        ${(() => { const d = diasComPessoa(t); return d && t.status !== 'concluido' ? `<p class="ct-meta">📅 Com você ${d.texto}</p>` : ''; })()}
+      </a>`;
+  const render = (tarefas, offline) => {
+    ultima = { tarefas, offline };
+    // concluídas (o líder já deu o ok) vão para a outra aba, para a lista do dia ficar curta
+    const fazer = tarefas.filter((t) => t.status !== 'concluido');
+    const feitas = tarefas.filter((t) => t.status === 'concluido');
+    // a fazer: primeiro as não entregues (em andamento, depois pendentes, por prazo); entregues por último
+    fazer.sort((a, b) => (!!a.finalizada_em - !!b.finalizada_em)
+      || ((a.status === 'em_andamento' ? 0 : 1) - (b.status === 'em_andamento' ? 0 : 1))
+      || String(a.prazo || '9').localeCompare(String(b.prazo || '9')));
+    feitas.sort((a, b) => String(b.finalizada_em || b.criado_em || '').localeCompare(String(a.finalizada_em || a.criado_em || '')));
+    const n = { fazer: fazer.length, concluidas: feitas.length };
+    $$('.aba', el).forEach((b) => { b.classList.toggle('ativa', b.dataset.a === aba); b.querySelector('.aba-n').textContent = n[b.dataset.a]; });
+    const lista = aba === 'fazer' ? fazer : feitas;
+    $('#lista', el).innerHTML = (offline ? '<p class="dica">Sem internet: mostrando a última lista guardada.</p>' : '')
+      + (lista.length ? lista.map(cartao).join('')
+        : `<p class="vazio">${aba === 'fazer' ? 'Nenhuma demanda para fazer agora.' : 'Nenhuma demanda concluída ainda.'}</p>`);
   };
+  $$('.aba', el).forEach((b) => {
+    b.onclick = () => {
+      aba = b.dataset.a;
+      try { sessionStorage.setItem('rondaluz-aba-minhas', aba); } catch { /* sem armazenamento */ }
+      render([...ultima.tarefas], ultima.offline);
+    };
+  });
 
   const guardadas = (await local.cacheLer(k)) || [];
   if (guardadas.length) render([...guardadas], !navigator.onLine);
