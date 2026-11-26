@@ -111,8 +111,14 @@ export async function telaMinhas(el, _p, ctx) {
     $('#lista', el).innerHTML = '<p class="vazio">Sem internet e nenhuma demanda guardada ainda.</p>';
   }
 
-  const parar = navigator.onLine ? api.ouvir('minhas', [{ tabela: 'tarefas' }], () => ctx.recarregar()) : () => {};
-  return parar;
+  // só recarrega se a lista ainda for a tela aberta (senão fecharia a ficha no campo)
+  let ativa = el.isConnected;
+  let t;
+  const parar = navigator.onLine && ativa ? api.ouvir('minhas', [{ tabela: 'tarefas' }], () => {
+    clearTimeout(t);
+    t = setTimeout(() => { if (ativa && el.isConnected) ctx.recarregar(); }, 500);
+  }) : () => {};
+  return () => { ativa = false; clearTimeout(t); parar(); };
 }
 
 // ------------------------------------------------------------------

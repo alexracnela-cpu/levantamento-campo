@@ -18,19 +18,33 @@ import {
 // Painel
 // ------------------------------------------------------------------
 export async function telaPainel(el, _p, ctx) {
-  let filtro = sessionStorage.getItem('rondaluz-filtro') || 'todas';
-  let filtroMoto = sessionStorage.getItem('rondaluz-filtro-moto') || 'todos';
-  el.innerHTML = `<section class="pagina">
+  const lembrar = (k, v) => { try { sessionStorage.setItem(`rondaluz-${k}`, v); } catch { /* sem armazenamento */ } };
+  const lembrado = (k, padrao) => { try { return sessionStorage.getItem(`rondaluz-${k}`) || padrao; } catch { return padrao; } };
+  let filtro = lembrado('filtro', 'todas');
+  let filtroMoto = lembrado('filtro-moto', 'todos');
+  let ordem = lembrado('ordem', 'recentes');
+  let busca = '';
+  const ABAS = [['todas', 'Todas'], ['revisar', 'Para revisar'], ['pendente', 'Pendentes'], ['em_andamento', 'Em andamento'], ['concluido', 'Concluídas']];
+  el.innerHTML = `<section class="pagina pagina-larga">
     <div class="cabecalho-pagina">
       <h1>Levantamentos</h1>
       <a class="btn primario" href="#/nova">+ Nova demanda</a>
     </div>
     <div class="abas" role="tablist">
-      ${[['todas', 'Todas'], ['pendente', 'Pendentes'], ['em_andamento', 'Em andamento'], ['concluido', 'Concluídas']]
-    .map(([v, t]) => `<button class="aba" data-f="${v}" role="tab">${t}</button>`).join('')}
+      ${ABAS.map(([v, t]) => `<button class="aba" data-f="${v}" role="tab">${t} <small class="aba-n"></small></button>`).join('')}
     </div>
-    <div id="motos" class="filtro-motos" aria-label="Filtrar por motoqueiro"></div>
-    <div id="lista" class="lista-tarefas"><p class="vazio">Carregando…</p></div>
+    <div class="filtros-lista">
+      <label class="largo">Buscar<input type="search" id="busca" placeholder="Título, descrição, ofício ou motoqueiro" autocomplete="off"></label>
+      <label>Motoqueiro<select id="f-moto"></select></label>
+      <label>Ordenar por<select id="f-ordem">
+        <option value="recentes">Mais recentes</option>
+        <option value="prazo">Prazo mais próximo</option>
+        <option value="dias">Mais dias com o motoqueiro</option>
+        <option value="titulo">Título (A–Z)</option>
+      </select></label>
+    </div>
+    <p class="dica" id="qtd"></p>
+    <div id="lista" class="tabela-rolagem"><p class="vazio">Carregando…</p></div>
   </section>`;
 
   let tarefas = [];
@@ -45,40 +59,62 @@ export async function telaPainel(el, _p, ctx) {
     return id ? cores[h % cores.length] : '#8a93a6';
   };
   const avatar = (id, nome) => `<span class="avatar" style="background:${corDe(id)}">${esc(iniciais(nome))}</span>`;
+  const nomeDe = (id) => (id ? (equipe[id]?.nome || equipe[id]?.email || '—') : 'Sem motoqueiro');
+  const paraRevisar = (t) => !!(t.finalizada_em || t.impedimento) && t.status !== 'concluido';
+  const semAcento = (x) => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const passaStatus = (t, f) => f === 'todas' || (f === 'revisar' ? paraRevisar(t) : t.status === f);
 
   const render = () => {
-    $$('.aba', el).forEach((b) => b.classList.toggle('ativa', b.dataset.f === filtro));
-    const porStatus = tarefas.filter((t) => filtro === 'todas' || t.status === filtro);
+    $$('.aba', el).forEach((b) => {
+      b.classList.toggle('ativa', b.dataset.f === filtro);
+      b.querySelector('.aba-n').textContent = tarefas.filter((t) => passaStatus(t, b.dataset.f)).length;
+    });
+    const porStatus = tarefas.filter((t) => passaStatus(t, filtro));
 
-    // filtro por motoqueiro, com quantas demandas cada um tem no filtro de status atual
+    // lista de motoqueiros, com quantas demandas cada um tem no status escolhido
     const grupos = new Map();
     porStatus.forEach((t) => { const k = t.motoqueiro_id || 'nenhum'; grupos.set(k, (grupos.get(k) || 0) + 1); });
     if (filtroMoto !== 'todos' && !grupos.has(filtroMoto)) filtroMoto = 'todos';
-    const chips = [...grupos.entries()].sort((a, b) => (equipe[a[0]]?.nome || 'zz').localeCompare(equipe[b[0]]?.nome || 'zz'));
-    $('#motos', el).innerHTML = `<button class="chip-moto ${filtroMoto === 'todos' ? 'ativo' : ''}" data-m="todos">Todos <small>${porStatus.length}</small></button>`
-      + chips.map(([k, n]) => {
-        const nome = k === 'nenhum' ? 'Sem motoqueiro' : (equipe[k]?.nome || equipe[k]?.email || '—');
-        return `<button class="chip-moto ${filtroMoto === k ? 'ativo' : ''}" data-m="${esc(k)}">${avatar(k === 'nenhum' ? '' : k, nome)}${esc(nome)} <small>${n}</small></button>`;
-      }).join('');
-    $$('.chip-moto', el).forEach((b) => {
-      b.onclick = () => { filtroMoto = b.dataset.m; sessionStorage.setItem('rondaluz-filtro-moto', filtroMoto); render(); };
-    });
+    const opcoes = [...grupos.entries()].sort((x, y) => nomeDe(x[0] === 'nenhum' ? '' : x[0]).localeCompare(nomeDe(y[0] === 'nenhum' ? '' : y[0])));
+    $('#f-moto', el).innerHTML = `<option value="todos">Todos (${porStatus.length})</option>`
+      + opcoes.map(([k, n]) => `<option value="${esc(k)}">${esc(nomeDe(k === 'nenhum' ? '' : k))} (${n})</option>`).join('');
+    $('#f-moto', el).value = filtroMoto;
+    $('#f-ordem', el).value = ordem;
 
-    const lista = porStatus.filter((t) => filtroMoto === 'todos' || (t.motoqueiro_id || 'nenhum') === filtroMoto);
-    $('#lista', el).innerHTML = lista.length ? lista.map((t) => {
-      const m = equipe[t.motoqueiro_id];
-      const nome = m?.nome || m?.email || 'Sem motoqueiro';
-      return `
-      <a class="cartao-tarefa" href="#/tarefa/${t.id}">
-        <div class="ct-topo">${seloStatus(t.status)}${t.finalizada_em && t.status !== 'concluido' ? '<span class="selo selo-entregue">✓ entregue — revisar</span>' : ''}</div>
-        <h3>${esc(t.titulo)}</h3>
-        <div class="ct-moto">${avatar(t.motoqueiro_id, nome)}<div><b>${esc(nome)}</b><small>${contagem[t.id] || 0} ponto(s) levantado(s)</small></div>${(() => {
+    const termo = semAcento(busca.trim());
+    const lista = porStatus
+      .filter((t) => filtroMoto === 'todos' || (t.motoqueiro_id || 'nenhum') === filtroMoto)
+      .filter((t) => !termo || semAcento(`${t.titulo} ${t.descricao} ${t.oficio_nome} ${nomeDe(t.motoqueiro_id)}`).includes(termo));
+    const dias = (t) => diasComPessoa(t)?.dias ?? -1;
+    const ordenar = {
+      recentes: (x, y) => String(y.criado_em || '').localeCompare(String(x.criado_em || '')),
+      prazo: (x, y) => String(x.prazo || '9999').localeCompare(String(y.prazo || '9999')),
+      dias: (x, y) => dias(y) - dias(x),
+      titulo: (x, y) => String(x.titulo || '').localeCompare(String(y.titulo || ''), 'pt-BR'),
+    }[ordem] || (() => 0);
+    lista.sort(ordenar);
+
+    $('#qtd', el).textContent = `${lista.length} de ${tarefas.length} demanda(s)`;
+    $('#lista', el).innerHTML = lista.length ? `<table class="tabela-uso tabela-demandas">
+      <thead><tr><th>Status</th><th>Demanda</th><th>Motoqueiro</th><th class="d">Pontos</th><th class="d">Dias</th><th>Prazo</th><th>Criada em</th></tr></thead>
+      <tbody class="corpo-dem">${lista.map((t) => {
     const d = diasComPessoa(t);
-    return d ? `<span class="dias-com ${d.aberta && d.dias >= 7 ? 'muitos' : ''}" title="Desde ${horaBR(d.desde.toISOString())}"><b>${d.dias}</b>${d.dias === 1 ? 'dia' : 'dias'}</span>` : '';
-  })()}</div>
-        <p class="ct-meta ${prazoVencido(t.prazo, t.status) ? 'vencido' : ''}">Prazo: ${dataBR(t.prazo)}${prazoVencido(t.prazo, t.status) ? ' · atrasada' : ''}</p>
-      </a>`;
-    }).join('') : '<p class="vazio">Nenhuma demanda aqui.</p>';
+    const vencido = prazoVencido(t.prazo, t.status);
+    return `<tr class="linha-dem" data-href="#/tarefa/${t.id}" tabindex="0">
+          <td data-r="Status">${seloStatus(t.status)}${t.impedimento && t.status !== 'concluido' ? '<span class="selo selo-alerta">⛔ não foi possível</span>' : (paraRevisar(t) ? '<span class="selo selo-entregue">✓ revisar</span>' : '')}</td>
+          <td data-r="Demanda" class="td-titulo"><a href="#/tarefa/${t.id}"><b>${esc(t.titulo)}</b></a>${t.descricao ? `<small>${esc(String(t.descricao).split('\n')[0].slice(0, 90))}</small>` : ''}</td>
+          <td data-r="Motoqueiro"><span class="td-moto">${avatar(t.motoqueiro_id, nomeDe(t.motoqueiro_id))}${esc(nomeDe(t.motoqueiro_id))}</span></td>
+          <td data-r="Pontos" class="d"><b>${contagem[t.id] || 0}</b></td>
+          <td data-r="Dias" class="d">${d ? `<span class="dias-tab ${d.aberta && d.dias >= 7 ? 'muitos' : ''}" title="Desde ${horaBR(d.desde.toISOString())}">${d.dias}</span>` : '—'}</td>
+          <td data-r="Prazo" class="${vencido ? 'vencido' : ''}">${dataBR(t.prazo)}${vencido ? '<small>atrasada</small>' : ''}</td>
+          <td data-r="Criada em">${horaBR(t.criado_em) || '—'}</td>
+        </tr>`;
+  }).join('')}</tbody></table>`
+      : `<p class="vazio">${termo ? 'Nada encontrado com essa busca.' : 'Nenhuma demanda aqui.'}</p>`;
+    $$('tr[data-href]', el).forEach((tr) => {
+      tr.onclick = (e) => { if (!e.target.closest('a')) ctx.navegar(tr.dataset.href); };
+      tr.onkeydown = (e) => { if (e.key === 'Enter') ctx.navegar(tr.dataset.href); };
+    });
   };
 
   const carregar = async () => {
@@ -95,8 +131,12 @@ export async function telaPainel(el, _p, ctx) {
   };
 
   $$('.aba', el).forEach((b) => {
-    b.onclick = () => { filtro = b.dataset.f; sessionStorage.setItem('rondaluz-filtro', filtro); render(); };
+    b.onclick = () => { filtro = b.dataset.f; lembrar('filtro', filtro); render(); };
   });
+  $('#f-moto', el).onchange = (e) => { filtroMoto = e.target.value; lembrar('filtro-moto', filtroMoto); render(); };
+  $('#f-ordem', el).onchange = (e) => { ordem = e.target.value; lembrar('ordem', ordem); render(); };
+  let tb;
+  $('#busca', el).oninput = (e) => { busca = e.target.value; clearTimeout(tb); tb = setTimeout(render, 150); };
 
   await carregar();
   let t;
@@ -104,7 +144,7 @@ export async function telaPainel(el, _p, ctx) {
     clearTimeout(t);
     t = setTimeout(carregar, 600);
   });
-  return () => { parar(); clearTimeout(t); };
+  return () => { parar(); clearTimeout(t); clearTimeout(tb); };
 }
 
 // ------------------------------------------------------------------

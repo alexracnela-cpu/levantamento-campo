@@ -38,7 +38,13 @@ function navegar(hash) {
   else location.hash = hash;
 }
 
+// Cada abertura de tela ganha um número. Se o usuário trocar de tela antes de a
+// anterior terminar de carregar, a anterior é desligada assim que terminar e o
+// que ela desenhar vai para uma área já fora da página (não mistura dados).
+let numeroTela = 0;
+
 async function rotear() {
+  const meu = ++numeroTela;
   if (limparTela) { try { limparTela(); } catch { /* ignora */ } limparTela = null; }
   window.scrollTo(0, 0);
   if (!ctx.perfil) return;
@@ -49,11 +55,16 @@ async function rotear() {
     if (m) {
       const params = Object.fromEntries(nomes.map((n, i) => [n, m[i + 1]]));
       marcarMenu(hash);
+      const area = document.createElement('div');
+      area.className = 'area-tela';
+      tela.replaceChildren(area);
       try {
-        limparTela = await fn(tela, params, ctx);
+        const limpar = await fn(area, params, ctx);
+        if (meu === numeroTela) limparTela = limpar;
+        else if (typeof limpar === 'function') { try { limpar(); } catch { /* ignora */ } }
       } catch (e) {
         console.error(e);
-        tela.innerHTML = `<section class="pagina"><p class="vazio">Erro: ${esc(mensagemErro(e))}</p></section>`;
+        if (meu === numeroTela) area.innerHTML = `<section class="pagina"><p class="vazio">Erro: ${esc(mensagemErro(e))}</p></section>`;
       }
       return;
     }
@@ -365,6 +376,7 @@ async function sair() {
   const s = await estadoFila();
   if (s.pontos + s.fotos > 0
     && !window.confirm(`Ainda há ${s.pontos + s.fotos} item(ns) não enviados. Se sair agora, eles continuam guardados neste aparelho e sobem quando você entrar de novo. Sair?`)) return;
+  numeroTela++;
   if (limparTela) { limparTela(); limparTela = null; }
   await api.sair();
 }
