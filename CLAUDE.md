@@ -10,9 +10,10 @@ Depois de qualquer alteração em `js/`, `css/` ou `icones/`:
 1. Ajuste o simulador se precisar (`treinamento/demo.js`: dados de exemplo e o Supabase de mentira;
    `treinamento/shell.html`: roteiro; `treinamento/build.py`: lista `MODULOS` quando surgir módulo novo).
 2. Gere a página: `python3 treinamento/build.py` → `treinamento/rondaluz-treinamento.html` (não vai para o Git).
-3. Republique o artefato **"RondaLuz — Treinamento (v31)"** (slug `6c3dbae9-47f4-4a19-975e-5d4c48bb10bf`)
+3. Republique o artefato **"RondaLuz — Treinamento (v31.1)"** (slug `1f498996-0961-48e7-9641-169bda85000f`)
    com `publish_files`, arquivo como `index.html`, usando a versão atual como `base_version`.
-   (O antigo, slug `2607a81c-…`, é público e não dá para republicar sem acesso à internet; não usar.)
+   (Os antigos `2607a81c-…` e `6c3dbae9-…` ficaram públicos e não dá para republicar sem acesso à internet; não usar.)
+   O montador recusa a palavra "body" no CSS (inclusive `tbody`): use classes.
 4. Teste o fluxo mexido no simulador (Playwright + Leaflet local) antes de publicar.
 
 ## Outras regras
