@@ -88,6 +88,7 @@ export async function telaMinhas(el, _p, ctx) {
       <a class="cartao-tarefa" href="#/campo/${t.id}">
         <div class="ct-topo">${seloStatus(t.status)}${t.finalizada_em && t.status !== 'concluido' ? ' <span class="selo selo-entregue">✓ entregue · aguardando o líder</span>' : ''}</div>
         <h3>${esc(t.titulo)}</h3>
+        ${t.logradouro || t.bairro ? `<p class="ct-end">📍 ${esc([t.logradouro, t.bairro].filter(Boolean).join(' · '))}</p>` : ''}
         ${t.descricao ? `<p class="ct-desc">${esc(t.descricao)}</p>` : ''}
         <p class="ct-meta ${prazoVencido(t.prazo, t.status) ? 'vencido' : ''}">Prazo: ${dataBR(t.prazo)}${t.oficio_path ? ' · 📄 ofício' : ''}</p>
         ${(() => { const d = diasComPessoa(t); return d && t.status !== 'concluido' ? `<p class="ct-meta">📅 Com você ${d.texto}</p>` : ''; })()}
@@ -165,7 +166,14 @@ export async function telaCampo(el, { id }, ctx) {
     return null;
   }
 
-  el.innerHTML = `<section class="tela-campo">
+  // entrega ainda na fila do celular (sem internet ou enviando) também conta
+  try {
+    const fila = await local.todos('fila');
+    if (fila.some((f) => f.id === `finalizar:${id}`) && !tarefa.finalizada_em) tarefa = { ...tarefa, finalizada_em: new Date().toISOString() };
+  } catch { /* sem fila */ }
+  // entregue pelo motoqueiro (ou concluída): só consulta, até o líder devolver
+  const travada = !!tarefa.finalizada_em || tarefa.status === 'concluido';
+  el.innerHTML = `<section class="tela-campo ${travada ? 'travada' : ''}">
     <div id="mapa" class="mapa"></div>
     <div class="campo-topo">
       <a class="btn redondo" href="#/minhas" aria-label="Voltar">←</a>
@@ -183,6 +191,7 @@ export async function telaCampo(el, { id }, ctx) {
       <button class="chip-proximo" id="b-proximo" aria-label="Escolher poste e luminária do próximo ponto"></button>
       <div class="campo-dica" id="dica">Toque no mapa para marcar um ponto.</div>
     </div>
+    ${travada ? `<div class="campo-travada">🔒 ${tarefa.status === 'concluido' ? 'Demanda concluída pelo líder' : 'Demanda entregue'}: só para consulta. Para alterar, peça ao líder para devolver.</div>` : ''}
     <div id="ficha" class="ficha" hidden></div>
   </section>`;
   document.body.classList.add('modo-campo');
@@ -306,12 +315,14 @@ export async function telaCampo(el, { id }, ctx) {
   const guardarPontosBons = (rd) => pontosBons.set(rd.rede.id, rd.rede.pontos.map((p) => [...p]));
   const criarRede = (r) => {
     const rd = new RedeNoMapa(mapa, r, {
-      editavel: true,
+      editavel: !travada,
       aoTocar: (alvo, ll) => {
+        if (travada) { aviso(`Rede: ${formatarMetros(metragemRede(alvo.rede))}. Demanda entregue: só consulta.`); return; }
         if (desenhando) { adicionarVertice([ll.lat, ll.lng]); return; }
         selecionarRede(alvo);
       },
       aoTocarVertice: (alvo, i, ll) => {
+        if (travada) return;
         // desenhando: tocar num ponto antigo continua o cabo até ele; fora disso, escolhe o ponto a ajustar
         if (desenhando && alvo === redeSel && i !== alvo.rede.pontos.length - 1) { adicionarVertice([ll.lat, ll.lng]); return; }
         alvo.verticeAtivo = i;
@@ -338,11 +349,25 @@ export async function telaCampo(el, { id }, ctx) {
   };
   (await carregarRedes()).forEach(criarRede);
 
+  // consulta de um ponto de demanda entregue (sem editar)
+  const verPontoTravado = (simb) => {
+    const p = simb.ponto;
+    const fs = fotosServidor.get(p.id) || [];
+    const { caixa, fechar } = abrirModal(`<h3>${p.plaqueta ? `Plaqueta ${esc(p.plaqueta)}` : `Ponto ${numeroDo(p.id)}`}</h3>
+      <p class="dica">🔒 Demanda entregue: só consulta.</p>
+      <p>${esc(nomePoste(tipoPoste(p)))}${p.poste ? ` <b>${esc(p.poste)}</b>` : ''} · <b>${p.qtd_luminarias ?? 1}</b> ${equipamento(p) === 'projetor' ? 'proj.' : 'lum.'} ${esc(nomeSituacao(p).toLowerCase())}</p>
+      ${p.observacoes ? `<p class="lp-obs">${esc(p.observacoes)}</p>` : ''}
+      ${fs.length ? `<div class="miniaturas">${fs.filter((f) => f.url).map((f) => `<img src="${f.url}" alt="Foto">`).join('')}</div>` : ''}
+      <div class="linha-botoes"><button class="btn primario" id="m-ok">OK</button></div>`);
+    $('#m-ok', caixa).onclick = fechar;
+  };
+
   const posicaoBoa = new Map(); // ponto id -> última posição aceita
   const criarSimbolo = (p) => {
     const s = new SimboloNoMapa(mapa, p, {
-      editavel: true,
+      editavel: !travada,
       aoTocar: (simb) => {
+        if (travada) { verPontoTravado(simb); return; }
         if (desenhando) { adicionarVertice(simb.latlng); return; } // encaixa a rede no centro do poste
         selecionar(simb);
       },
@@ -780,6 +805,7 @@ export async function telaCampo(el, { id }, ctx) {
   };
 
   mapa.on('click', (e) => {
+    if (travada) { aviso('Demanda entregue: não dá para alterar. Para mudar algo, peça ao líder para devolver.'); return; }
     if (desenhando) { adicionarVertice([e.latlng.lat, e.latlng.lng]); return; }
     if (redeSel) { selecionarRede(null); return; }
     if (selecionado) { selecionar(null); return; }
@@ -810,6 +836,7 @@ export async function telaCampo(el, { id }, ctx) {
       await local.cacheGravar(`tarefa:${id}`, tarefa);
       $('#campo-entregue', el).hidden = false;
       aviso(navigator.onLine ? 'Pronto! O líder foi avisado.' : 'Guardado. O líder é avisado quando a internet voltar.', 'ok');
+      ctx.recarregar(); // reabre só para consulta
     };
   };
   $('#b-aqui', el).onclick = () => {

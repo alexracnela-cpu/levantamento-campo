@@ -106,19 +106,19 @@ async function semear() {
     },
     tarefas: [
       {
-        id: t1, titulo: 'Av. do Centro — trecho principal',
+        id: t1, titulo: 'Av. do Centro — trecho principal', logradouro: 'Av. do Centro', bairro: 'Centro',
         descricao: 'Levantar todos os postes do trecho. Anotar luminárias apagadas e braços tortos.',
         prazo: hojeMais(3), area: retangulo(-150, -80, 150, 80), motoqueiro_id: UID.joao, status: 'em_andamento',
         criado_por: UID.lider, criado_em: iso(60 * 24 * 3 + 30), atribuida_em: iso(60 * 24 * 3),
         oficio_path: `${t1}/oficio-0043-2026.png`, oficio_nome: 'Ofício 0043-2026.png', oficio_tipo: 'image/png',
       },
       {
-        id: t2, titulo: 'Rua do Porto — praça', descricao: 'Conferir a iluminação da praça e das calçadas em volta.',
+        id: t2, titulo: 'Rua do Porto — praça', logradouro: 'Rua do Porto', bairro: 'Educandos', descricao: 'Conferir a iluminação da praça e das calçadas em volta.',
         prazo: hojeMais(8), area: retangulo(-120, 150, 120, 330), motoqueiro_id: UID.joao, status: 'pendente',
         criado_por: UID.lider, criado_em: iso(60 * 24 + 20), atribuida_em: iso(60 * 24),
       },
       {
-        id: t3, titulo: 'Rua Tarumã — quadra 4', descricao: '', prazo: hojeMais(-2),
+        id: t3, titulo: 'Rua Tarumã — quadra 4', logradouro: 'Rua Tarumã', bairro: 'Japiim', descricao: '', prazo: hojeMais(-2),
         area: retangulo(120, -300, 320, -140), motoqueiro_id: UID.carla, status: 'concluido',
         criado_por: UID.lider, criado_em: iso(60 * 24 * 9), atribuida_em: iso(60 * 24 * 9), finalizada_em: iso(60 * 24 * 5),
       },

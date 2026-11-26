@@ -14,6 +14,17 @@ import {
   $, $$, esc, aviso, dataBR, horaBR, prazoVencido, novoId, nomeArquivoSeguro, mensagemErro, STATUS, diasComPessoa,
 } from './util.js';
 
+// Bairros de Manaus (sugestões no campo Bairro; dá para digitar outro)
+const BAIRROS_MANAUS = ['Adrianópolis', 'Aleixo', 'Alvorada', 'Armando Mendes', 'Betânia', 'Cachoeirinha', 'Centro', 'Chapada',
+  'Cidade de Deus', 'Cidade Nova', 'Colônia Antônio Aleixo', 'Colônia Oliveira Machado', 'Colônia Santo Antônio', 'Colônia Terra Nova',
+  'Compensa', 'Coroado', 'Crespo', 'Da Paz', 'Distrito Industrial I', 'Distrito Industrial II', 'Dom Pedro', 'Educandos', 'Flores',
+  'Gilberto Mestrinho', 'Glória', 'Japiim', 'Jorge Teixeira', 'Lago Azul', 'Lírio do Vale', 'Mauazinho', 'Monte das Oliveiras',
+  'Morro da Liberdade', 'Nossa Senhora Aparecida', 'Nossa Senhora das Graças', 'Nova Cidade', 'Nova Esperança', 'Novo Aleixo',
+  'Novo Israel', 'Parque 10 de Novembro', 'Petrópolis', 'Planalto', 'Ponta Negra', 'Praça 14 de Janeiro', 'Presidente Vargas',
+  'Puraquequara', 'Raiz', 'Redenção', 'Santa Etelvina', 'Santa Luzia', 'Santo Agostinho', 'Santo Antônio', 'São Francisco',
+  'São Geraldo', 'São Jorge', 'São José Operário', 'São Lázaro', 'São Raimundo', 'Tancredo Neves', 'Tarumã', 'Tarumã-Açu',
+  'Vila Buriti', 'Vila da Prata', 'Zumbi dos Palmares'];
+
 // ------------------------------------------------------------------
 // Painel
 // ------------------------------------------------------------------
@@ -34,7 +45,7 @@ export async function telaPainel(el, _p, ctx) {
       ${ABAS.map(([v, t]) => `<button class="aba" data-f="${v}" role="tab">${t} <small class="aba-n"></small></button>`).join('')}
     </div>
     <div class="filtros-lista">
-      <label class="largo">Buscar<input type="search" id="busca" placeholder="Título, descrição, ofício ou motoqueiro" autocomplete="off"></label>
+      <label class="largo">Buscar<input type="search" id="busca" placeholder="Título, logradouro, bairro, ofício ou motoqueiro" autocomplete="off"></label>
       <label>Motoqueiro<select id="f-moto"></select></label>
       <label>Ordenar por<select id="f-ordem">
         <option value="recentes">Mais recentes</option>
@@ -84,7 +95,7 @@ export async function telaPainel(el, _p, ctx) {
     const termo = semAcento(busca.trim());
     const lista = porStatus
       .filter((t) => filtroMoto === 'todos' || (t.motoqueiro_id || 'nenhum') === filtroMoto)
-      .filter((t) => !termo || semAcento(`${t.titulo} ${t.descricao} ${t.oficio_nome} ${nomeDe(t.motoqueiro_id)}`).includes(termo));
+      .filter((t) => !termo || semAcento(`${t.titulo} ${t.descricao} ${t.oficio_nome} ${t.logradouro} ${t.bairro} ${nomeDe(t.motoqueiro_id)}`).includes(termo));
     const dias = (t) => diasComPessoa(t)?.dias ?? -1;
     const ordenar = {
       recentes: (x, y) => String(y.criado_em || '').localeCompare(String(x.criado_em || '')),
@@ -102,7 +113,7 @@ export async function telaPainel(el, _p, ctx) {
     const vencido = prazoVencido(t.prazo, t.status);
     return `<tr class="linha-dem" data-href="#/tarefa/${t.id}" tabindex="0">
           <td data-r="Status">${seloStatus(t.status)}${t.impedimento && t.status !== 'concluido' ? '<span class="selo selo-alerta">⛔ não foi possível</span>' : (paraRevisar(t) ? '<span class="selo selo-entregue">✓ revisar</span>' : '')}</td>
-          <td data-r="Demanda" class="td-titulo"><a href="#/tarefa/${t.id}"><b>${esc(t.titulo)}</b></a>${t.descricao ? `<small>${esc(String(t.descricao).split('\n')[0].slice(0, 90))}</small>` : ''}</td>
+          <td data-r="Demanda" class="td-titulo"><a href="#/tarefa/${t.id}"><b>${esc(t.titulo)}</b></a>${t.logradouro || t.bairro ? `<small class="td-end">📍 ${esc([t.logradouro, t.bairro].filter(Boolean).join(' · '))}</small>` : ''}${t.descricao ? `<small>${esc(String(t.descricao).split('\n')[0].slice(0, 90))}</small>` : ''}</td>
           <td data-r="Motoqueiro"><span class="td-moto">${avatar(t.motoqueiro_id, nomeDe(t.motoqueiro_id))}${esc(nomeDe(t.motoqueiro_id))}</span></td>
           <td data-r="Pontos" class="d"><b>${contagem[t.id] || 0}</b></td>
           <td data-r="Dias" class="d">${d ? `<span class="dias-tab ${d.aberta && d.dias >= 7 ? 'muitos' : ''}" title="Desde ${horaBR(d.desde.toISOString())}">${d.dias}</span>` : '—'}</td>
@@ -167,6 +178,12 @@ export async function telaNovaTarefa(el, _p, ctx) {
       <h2>Nova demanda</h2>
       <form id="form" class="formulario">
         <label>Título<input name="titulo" required maxlength="140" placeholder="Ex.: Levantamento Av. Djalma Batista"></label>
+        <div class="grade-campos">
+          <label class="largura-total">Logradouro<input name="logradouro" required minlength="3" maxlength="160" placeholder="Ex.: Av. Djalma Batista / Beco 17 de Outubro"></label>
+          <label class="largura-total">Bairro<input name="bairro" required minlength="2" maxlength="80" placeholder="Ex.: Japiim" list="bairros-manaus"></label>
+          <p class="dica largura-total" id="dica-endereco">Ao desenhar a área, o app sugere o logradouro e o bairro. Confira antes de criar.</p>
+        </div>
+        <datalist id="bairros-manaus">${BAIRROS_MANAUS.map((b) => `<option value="${b}">`).join('')}</datalist>
         <label>Descrição<textarea name="descricao" rows="3" placeholder="O que o motoqueiro deve levantar"></textarea></label>
         <label>Prazo<input type="date" name="prazo"></label>
         <label>Motoqueiro<select name="motoqueiro_id" required><option value="">Carregando…</option></select></label>
@@ -181,8 +198,30 @@ export async function telaNovaTarefa(el, _p, ctx) {
 
   const mapa = criarMapa($('#mapa', el));
   let area = [];
+  // sugere logradouro e bairro pelo centro da área (só preenche campo vazio ou ainda sugerido)
+  const sugerido = { logradouro: '', bairro: '' };
+  let tSug;
+  const sugerirEndereco = () => {
+    clearTimeout(tSug);
+    if (area.length < 3) return;
+    tSug = setTimeout(async () => {
+      const lat = area.reduce((t, p) => t + p[0], 0) / area.length;
+      const lng = area.reduce((t, p) => t + p[1], 0) / area.length;
+      try {
+        const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=17&addressdetails=1&lat=${lat}&lon=${lng}`, { headers: { 'Accept-Language': 'pt-BR' } });
+        const a = (await r.json())?.address || {};
+        const valores = { logradouro: a.road || a.pedestrian || a.footway || '', bairro: a.suburb || a.neighbourhood || a.quarter || a.city_district || '' };
+        Object.entries(valores).forEach(([campo, v]) => {
+          const inp = $(`input[name=${campo}]`, el);
+          if (!inp || !v) return;
+          if (!inp.value.trim() || inp.value === sugerido[campo]) { inp.value = v; sugerido[campo] = v; }
+        });
+      } catch { /* sem sugestão: o líder digita */ }
+    }, 900);
+  };
   const desenho = new DesenhoDeArea(mapa, (v) => {
     area = v;
+    sugerirEndereco();
     $('#info-area', el).textContent = v.length < 3
       ? `${v.length} canto(s). Faltam ${3 - v.length} para fechar a área.`
       : `Área com ${v.length} cantos. Arraste os números para ajustar.`;
@@ -223,6 +262,9 @@ export async function telaNovaTarefa(el, _p, ctx) {
     e.preventDefault();
     if (area.length < 3) { aviso('Desenhe a área no mapa (pelo menos 3 cantos).', 'erro'); return; }
     const f = new FormData(e.target);
+    if (!String(f.get('logradouro') || '').trim() || !String(f.get('bairro') || '').trim()) {
+      aviso('Preencha o logradouro e o bairro.', 'erro'); return;
+    }
     const botao = $('#b-salvar', el);
     botao.disabled = true;
     botao.textContent = 'Salvando…';
@@ -240,6 +282,8 @@ export async function telaNovaTarefa(el, _p, ctx) {
         id,
         titulo: f.get('titulo').trim(),
         descricao: f.get('descricao').trim(),
+        logradouro: f.get('logradouro').trim(),
+        bairro: f.get('bairro').trim(),
         prazo: f.get('prazo') || null,
         motoqueiro_id: f.get('motoqueiro_id') || null,
         area,
@@ -254,7 +298,7 @@ export async function telaNovaTarefa(el, _p, ctx) {
     }
   };
 
-  return () => { desenho.destruir(); mapa.remove(); };
+  return () => { clearTimeout(tSug); desenho.destruir(); mapa.remove(); };
 }
 
 // ------------------------------------------------------------------
@@ -288,6 +332,9 @@ export async function telaTarefaLider(el, { id }, ctx) {
       <div class="grade-campos">
         <label>Status<select id="status">${Object.entries(STATUS).map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select></label>
         <label>Prazo<input type="date" id="prazo"></label>
+        <label class="largura-total">Logradouro<input id="logradouro" maxlength="160" placeholder="Logradouro"></label>
+        <label class="largura-total">Bairro<input id="bairro" maxlength="80" placeholder="Bairro" list="bairros-manaus2"></label>
+        <datalist id="bairros-manaus2">${BAIRROS_MANAUS.map((b) => `<option value="${b}">`).join('')}</datalist>
         <p class="largura-total dias-linha" id="dias-com"></p>
         <label class="largura-total">Motoqueiro<select id="motoqueiro"><option value="">— sem motoqueiro —</option>
           ${equipe.filter((m) => m.papel !== 'bloqueado' || m.id === tarefa.motoqueiro_id).map((m) => `<option value="${m.id}">${esc(m.nome || m.email)}${m.papel === 'lider' ? ' (líder)' : ''}</option>`).join('')}</select></label>
@@ -314,6 +361,8 @@ export async function telaTarefaLider(el, { id }, ctx) {
     $('#descricao', el).textContent = tarefa.descricao || '';
     $('#status', el).value = tarefa.status;
     $('#prazo', el).value = tarefa.prazo || '';
+    if (document.activeElement !== $('#logradouro', el)) $('#logradouro', el).value = tarefa.logradouro || '';
+    if (document.activeElement !== $('#bairro', el)) $('#bairro', el).value = tarefa.bairro || '';
     $('#motoqueiro', el).value = tarefa.motoqueiro_id || '';
     const d = diasComPessoa(tarefa);
     const quemTem = equipe.find((m) => m.id === tarefa.motoqueiro_id)?.nome;
@@ -352,6 +401,13 @@ export async function telaTarefaLider(el, { id }, ctx) {
   };
   $('#status', el).onchange = (e) => salvarCampo({ status: e.target.value }, 'Status atualizado.');
   $('#prazo', el).onchange = (e) => salvarCampo({ prazo: e.target.value || null }, 'Prazo atualizado.');
+  ['logradouro', 'bairro'].forEach((campo) => {
+    $(`#${campo}`, el).onchange = (e) => {
+      const v = e.target.value.trim();
+      if (!v) { aviso(`O ${campo} é obrigatório.`, 'erro'); e.target.value = tarefa[campo] || ''; return; }
+      if (v !== (tarefa[campo] || '')) salvarCampo({ [campo]: v }, `${campo === 'bairro' ? 'Bairro' : 'Logradouro'} atualizado.`);
+    };
+  });
   $('#motoqueiro', el).onchange = async (e) => {
     await salvarCampo({ motoqueiro_id: e.target.value || null }, 'Motoqueiro alterado. A contagem de dias recomeça.');
     tarefa.atribuida_em = e.target.value ? new Date().toISOString() : null;

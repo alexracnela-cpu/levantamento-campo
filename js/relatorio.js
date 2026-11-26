@@ -263,6 +263,8 @@ export async function montarRelatorio({ tarefa, equipe, pontos, fotos, urls, red
   const nome = (p, i) => (p.plaqueta ? `Plaqueta ${esc(p.plaqueta)}` : `Ponto ${i + 1}`);
 
   const info = [
+    ['Logradouro', esc(tarefa.logradouro || '—')],
+    ['Bairro', esc(tarefa.bairro || '—')],
     ['Motoqueiro', esc(moto?.nome || moto?.email || '—')],
     ['Criada por', esc(lider?.nome || '—')],
     ['Criada em', horaBR(tarefa.criado_em) || '—'],

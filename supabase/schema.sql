@@ -874,3 +874,9 @@ alter table public.redes add constraint redes_cabo_valido check (
   cabo is null or cabo in ('multiplexado', 'aluminio_nu', 'cabo_pp', 'smc', 'zero_bt', 'blindada', 'concentrica')
 );
 notify pgrst, 'reload schema';
+
+-- =====================================================================
+-- (incluído de supabase/logradouro.sql)
+alter table public.tarefas add column if not exists logradouro text not null default '';
+alter table public.tarefas add column if not exists bairro text not null default '';
+notify pgrst, 'reload schema';
