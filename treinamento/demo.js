@@ -551,15 +551,11 @@ function desenharFundoRelatorio(g, P, W, H) {
 function criarGeo(inst) {
   return {
     watchPosition(ok) {
-      let passo = 0;
+      // motoqueiro parado no meio da Av. do Centro, com a oscilação pequena de um GPS de verdade
       const emitir = () => {
         if (!inst.vivo) return;
-        const ciclo = 48;
-        const k = passo % ciclo;
-        const f = k < ciclo / 2 ? k / (ciclo / 2) : 2 - k / (ciclo / 2);
-        const [lat, lng] = em(-230 + f * 460, 3);
-        passo += 1;
-        ok({ coords: { latitude: lat, longitude: lng, accuracy: 6 } });
+        const [lat, lng] = em(10 + (Math.random() - 0.5) * 3, 3 + (Math.random() - 0.5) * 3);
+        ok({ coords: { latitude: lat, longitude: lng, accuracy: 5 } });
       };
       setTimeout(emitir, 300);
       const id = setInterval(emitir, 1500);
