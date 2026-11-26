@@ -91,6 +91,34 @@ export async function excluirRede(rede) {
   sincronizar();
 }
 
+export async function salvarEstrutura(est) {
+  const registro = {
+    id: est.id,
+    tarefa_id: est.tarefa_id,
+    nome: String(est.nome || '').trim(),
+    pontos: est.pontos,
+    observacoes: est.observacoes || '',
+  };
+  await local.gravar('fila', { id: est.id, tipo: 'estrutura', dados: registro, em: Date.now() });
+  const k = `estruturas:${est.tarefa_id}`;
+  const lista = (await local.cacheLer(k)) || [];
+  const i = lista.findIndex((x) => x.id === est.id);
+  if (i >= 0) lista[i] = { ...lista[i], ...registro };
+  else lista.push(registro);
+  await local.cacheGravar(k, lista);
+  await avisar();
+  sincronizar();
+}
+
+export async function excluirEstrutura(est) {
+  await local.gravar('fila', { id: est.id, tipo: 'excluir_estrutura', dados: { id: est.id, tarefa_id: est.tarefa_id }, em: Date.now() });
+  const k = `estruturas:${est.tarefa_id}`;
+  const lista = (await local.cacheLer(k)) || [];
+  await local.cacheGravar(k, lista.filter((r) => r.id !== est.id));
+  await avisar();
+  sincronizar();
+}
+
 // O motoqueiro avisa que terminou. Vai para o fim da fila: só sobe depois dos pontos.
 export async function finalizarTarefa(tarefaId, obs) {
   await local.gravar('fila', { id: `finalizar:${tarefaId}`, tipo: 'finalizar', dados: { tarefa_id: tarefaId, obs: obs || '' }, em: Date.now() });
@@ -153,6 +181,12 @@ export async function sincronizar() {
         if (error) throw error;
       } else if (item.tipo === 'rede') {
         const { error } = await sb.from('redes').upsert(item.dados, { onConflict: 'id' });
+        if (error) throw error;
+      } else if (item.tipo === 'estrutura') {
+        const { error } = await sb.from('estruturas').upsert(item.dados, { onConflict: 'id' });
+        if (error) throw error;
+      } else if (item.tipo === 'excluir_estrutura') {
+        const { error } = await sb.from('estruturas').delete().eq('id', item.id);
         if (error) throw error;
       } else if (item.tipo === 'excluir_rede') {
         const { error } = await sb.from('redes').delete().eq('id', item.id);

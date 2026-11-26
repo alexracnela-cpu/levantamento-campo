@@ -134,6 +134,9 @@ async function semear() {
     redes: [
       { id: 'r-1', tarefa_id: t1, tipo: 'secundaria', situacao: 'existente', pontos: [em(-70, 11), em(35, -11)].map((p) => [...p]), observacoes: '', criado_por: UID.joao, criado_em: iso(25), atualizado_em: iso(25) },
     ],
+    estruturas: [
+      { id: 'e-1', tarefa_id: t1, nome: 'Escola', pontos: [em(60, 25), em(125, 25), em(125, 70), em(60, 70)].map((p) => [...p]), observacoes: 'Iluminação só na frente', criado_por: UID.joao, criado_em: iso(20), atualizado_em: iso(20) },
+    ],
     fotos: [
       { id: 'f-1', ponto_id: 'p-1', tarefa_id: t1, path: `${t1}/p-1/f-1.jpg`, criado_por: UID.joao, criado_em: iso(39) },
       { id: 'f-q0', ponto_id: 'p-q0', tarefa_id: t3, path: `${t3}/p-q0/f-q0.jpg`, criado_por: UID.carla, criado_em: iso(2999) },
@@ -165,6 +168,7 @@ function apagarEmCascata(tabela, linha) {
   if (tabela === 'tarefas') {
     d.pontos.filter((p) => p.tarefa_id === linha.id).forEach((p) => apagarEmCascata('pontos', p));
     d.redes.filter((r) => r.tarefa_id === linha.id).forEach((r) => apagarEmCascata('redes', r));
+    d.estruturas.filter((r) => r.tarefa_id === linha.id).forEach((r) => apagarEmCascata('estruturas', r));
   }
   if (tabela === 'pontos') {
     d.fotos.filter((f) => f.ponto_id === linha.id).forEach((f) => apagarEmCascata('fotos', f));
@@ -182,12 +186,12 @@ function criarSb(inst) {
     if (p === 'lider') return true;
     if (t === 'perfis') return ativo() || r.id === inst.uid;
     if (t === 'tarefas') return ativo() && r.motoqueiro_id === inst.uid;
-    if (t === 'pontos' || t === 'fotos' || t === 'redes') return tarefaMinha(r.tarefa_id);
+    if (t === 'pontos' || t === 'fotos' || t === 'redes' || t === 'estruturas') return tarefaMinha(r.tarefa_id);
     return false;
   };
   const podeEscrever = (t, r) => {
     if (papel() === 'lider') return true;
-    if (t === 'pontos' || t === 'fotos' || t === 'redes') return tarefaMinha(r.tarefa_id);
+    if (t === 'pontos' || t === 'fotos' || t === 'redes' || t === 'estruturas') return tarefaMinha(r.tarefa_id);
     return false;
   };
   const chave = (t) => (t === 'convites' ? 'email' : 'id');
@@ -238,7 +242,7 @@ function criarSb(inst) {
           const atual = tab.find((r) => r[k] === v[k]);
           if (!podeEscrever(t, atual ? { ...atual, ...v } : v)) return negado;
           if (atual && this.op === 'upsert') {
-            Object.assign(atual, v, t === 'pontos' || t === 'redes' ? { atualizado_em: agora } : {});
+            Object.assign(atual, v, t === 'pontos' || t === 'redes' || t === 'estruturas' ? { atualizado_em: agora } : {});
             saida.push(atual);
             notificar(t, 'UPDATE', atual);
           } else if (atual) {
@@ -248,7 +252,7 @@ function criarSb(inst) {
               ...(t === 'convites' ? {} : { id: crypto.randomUUID() }),
               criado_em: agora,
               ...(t === 'tarefas' ? { status: 'pendente', descricao: '', criado_por: inst.uid, atribuida_em: v.motoqueiro_id ? agora : null } : {}),
-              ...(t === 'pontos' || t === 'redes' ? { atualizado_em: agora, criado_por: inst.uid } : {}),
+              ...(t === 'pontos' || t === 'redes' || t === 'estruturas' ? { atualizado_em: agora, criado_por: inst.uid } : {}),
               ...(t === 'convites' ? { convidado_por: inst.uid, usado_em: null } : {}),
               ...v,
             };
@@ -352,7 +356,7 @@ function criarSb(inst) {
       const tam = (linhas) => 8192 + JSON.stringify(linhas).length * 3;
       const soma = (l) => l.reduce((x, a) => x + a.bytes, 0);
       const orf = arqs.filter((a) => !existe(a.tarefa));
-      const tabelas = ['convites', 'fotos', 'perfis', 'pontos', 'redes', 'tarefas'].map((n) => ({ tabela: n, linhas: d[n].length, bytes: tam(d[n]) }));
+      const tabelas = ['convites', 'estruturas', 'fotos', 'perfis', 'pontos', 'redes', 'tarefas'].map((n) => ({ tabela: n, linhas: d[n].length, bytes: tam(d[n]) }));
       const demandas = d.tarefas.map((x) => {
         const da = arqs.filter((a) => a.tarefa === x.id);
         return {

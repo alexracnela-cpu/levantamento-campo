@@ -76,6 +76,7 @@ export const api = {
   // ---- pontos e fotos
   pontos: (tarefaId) => sb.from('pontos').select('*').eq('tarefa_id', tarefaId).order('criado_em').then(ok),
   redes: (tarefaId) => sb.from('redes').select('*').eq('tarefa_id', tarefaId).order('criado_em').then(ok),
+  estruturas: (tarefaId) => sb.from('estruturas').select('*').eq('tarefa_id', tarefaId).order('criado_em').then(ok),
   fotos: (tarefaId) => sb.from('fotos').select('*').eq('tarefa_id', tarefaId).order('criado_em').then(ok),
 
   // ---- arquivos

@@ -7,6 +7,9 @@ import {
 } from './simbolo.js';
 import { montarRelatorio } from './relatorio.js';
 import {
+  EstruturaNoMapa, nomeEstrutura, formatarArea, svgEstrutura, areaM2,
+} from './estrutura.js';
+import {
   RedeNoMapa, TIPOS, SITUACOES, svgLinha, legendaRede, metragemRede, formatarMetros,
 } from './rede.js';
 import { abrirModal, confirmar, verOficio, seloStatus } from './comum.js';
@@ -346,6 +349,8 @@ export async function telaTarefaLider(el, { id }, ctx) {
       </div>
       <h3 class="titulo-secao">Rede desenhada</h3>
       <div id="redes" class="resumo-redes"></div>
+      <h3 class="titulo-secao">Estruturas <span id="n-est" class="contador">0</span></h3>
+      <div id="estruturas" class="resumo-redes"></div>
       <h3 class="titulo-secao">Pontos levantados <span id="n-pontos" class="contador">0</span></h3>
       <ol id="pontos" class="lista-pontos"></ol>
       <div class="zona-perigo"><button class="btn perigo" id="b-excluir">Excluir demanda</button></div>
@@ -427,6 +432,8 @@ export async function telaTarefaLider(el, { id }, ctx) {
 
   const simbolos = new Map();
   const linhasRede = new Map();
+  const formasEst = new Map();
+  let estruturas = [];
   let redes = [];
   let pontos = [];
   let fotos = [];
@@ -464,7 +471,27 @@ export async function telaTarefaLider(el, { id }, ctx) {
     $('#redes', el).innerHTML = linhas.length ? `<ul>${linhas.join('')}</ul>${legendaRede()}` : '<p class="dica">Nenhuma rede desenhada ainda.</p>';
   };
 
+  const renderEstruturas = () => {
+    const vivas = new Set(estruturas.map((e) => e.id));
+    formasEst.forEach((f, eid) => { if (!vivas.has(eid)) { f.remover(); formasEst.delete(eid); } });
+    estruturas.forEach((e) => {
+      const f = formasEst.get(e.id);
+      if (f) f.atualizar(e);
+      else {
+        formasEst.set(e.id, new EstruturaNoMapa(mapa, e, {
+          aoTocar: (alvo) => { formasEst.forEach((x) => x.selecionar(x === alvo)); mapa.fitBounds(alvo.forma.getBounds(), { padding: [60, 60], maxZoom: 20 }); },
+        }));
+      }
+    });
+    $('#n-est', el).textContent = estruturas.length;
+    $('#estruturas', el).innerHTML = estruturas.length
+      ? `<ul>${estruturas.map((e) => `<li data-est="${e.id}" class="item-est">${svgEstrutura()} <span>${esc(nomeEstrutura(e))}${e.observacoes ? `<small> · ${esc(e.observacoes)}</small>` : ''}</span> <b>${formatarArea(areaM2(e.pontos))}</b></li>`).join('')}</ul>`
+      : '<p class="dica">Nenhuma estrutura desenhada.</p>';
+    $$('[data-est]', el).forEach((li) => { li.onclick = () => formasEst.get(li.dataset.est)?.aoTocar(formasEst.get(li.dataset.est)); });
+  };
+
   const render = () => {
+    renderEstruturas();
     renderRedes();
     const vivos = new Set(pontos.map((p) => p.id));
     simbolos.forEach((s, pid) => { if (!vivos.has(pid)) { s.remover(); simbolos.delete(pid); } });
@@ -500,7 +527,7 @@ export async function telaTarefaLider(el, { id }, ctx) {
 
   const carregar = async () => {
     try {
-      [pontos, fotos, redes] = await Promise.all([api.pontos(id), api.fotos(id), api.redes(id).catch(() => [])]);
+      [pontos, fotos, redes, estruturas] = await Promise.all([api.pontos(id), api.fotos(id), api.redes(id).catch(() => []), api.estruturas(id).catch(() => [])]);
       const faltando = fotos.map((f) => f.path).filter((p) => !urls[p]);
       if (faltando.length) Object.assign(urls, await api.urlsFotos(faltando));
       if (idsConhecidos) {
@@ -521,7 +548,7 @@ export async function telaTarefaLider(el, { id }, ctx) {
     if (janela) janela.document.write('<p style="font:16px Arial;padding:24px;color:#003c78">Gerando o relatório…</p>');
     try {
       const novas = fotos.length ? await api.urlsFotos(fotos.map((f) => f.path)) : {};
-      const html = await montarRelatorio({ tarefa, equipe, pontos, fotos, urls: { ...urls, ...novas }, redes });
+      const html = await montarRelatorio({ tarefa, equipe, pontos, fotos, urls: { ...urls, ...novas }, redes, estruturas });
       if (janela && !janela.closed) {
         janela.document.open();
         janela.document.write(html);
@@ -547,6 +574,7 @@ export async function telaTarefaLider(el, { id }, ctx) {
     { tabela: 'pontos', filtro: `tarefa_id=eq.${id}` },
     { tabela: 'fotos', filtro: `tarefa_id=eq.${id}` },
     { tabela: 'redes', filtro: `tarefa_id=eq.${id}` },
+    { tabela: 'estruturas', filtro: `tarefa_id=eq.${id}` },
     { tabela: 'tarefas', filtro: `id=eq.${id}` },
   ], (tabela, p) => {
     if (tabela === 'tarefas' && p.new && p.new.id) { tarefa = { ...tarefa, ...p.new }; preencher(); return; }

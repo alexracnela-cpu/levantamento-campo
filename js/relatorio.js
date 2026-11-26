@@ -12,6 +12,9 @@ import {
 import {
   esc, dataBR, horaBR, diasComPessoa,
 } from './util.js';
+import {
+  COR_ESTRUTURA, nomeEstrutura, areaM2, perimetroM, formatarArea, centroDe, svgEstrutura,
+} from './estrutura.js';
 
 const STATUS_TXT = { pendente: 'Pendente', em_andamento: 'Em andamento', concluido: 'Concluído' };
 const AZUL = '#003c78';
@@ -54,10 +57,10 @@ function carregarImagem(src, ms = 8000) {
 
 // opcoes.croqui = true: enquadra só pontos e rede, fundo bem claro, traços grossos,
 // metragem de cada trecho e plaqueta ao lado do número (para usar de croqui no AutoCAD).
-export async function mapaEstatico({ area, pontos, redes }, W = 1600, H = 1000, opcoes = {}) {
+export async function mapaEstatico({ area, pontos, redes, estruturas = [] }, W = 1600, H = 1000, opcoes = {}) {
   const croqui = !!opcoes.croqui;
   const K = croqui ? W / 1600 : 1; // escala dos traços e textos
-  const desenho = [...pontos.map((p) => [p.lat, p.lng]), ...redes.flatMap((r) => r.pontos || [])];
+  const desenho = [...pontos.map((p) => [p.lat, p.lng]), ...redes.flatMap((r) => r.pontos || []), ...estruturas.flatMap((e) => e.pontos || [])];
   const todos = croqui && desenho.length ? desenho : [...(area || []), ...desenho];
   if (!todos.length) return null;
   const lats = todos.map((p) => p[0]);
@@ -117,6 +120,20 @@ export async function mapaEstatico({ area, pontos, redes }, W = 1600, H = 1000, 
     g.setLineDash([16 * K, 10 * K]); g.lineWidth = (croqui ? 2.5 : 4) * K; g.strokeStyle = croqui ? 'rgba(0,60,120,.55)' : AZUL; g.stroke(); g.setLineDash([]);
   }
 
+  // estruturas (polígonos com nome)
+  const rotulosEst = [];
+  estruturas.forEach((es) => {
+    if ((es.pontos || []).length < 3) return;
+    g.beginPath();
+    es.pontos.forEach(([la, ln], i) => { const [x, y] = P(la, ln); if (i) g.lineTo(x, y); else g.moveTo(x, y); });
+    g.closePath();
+    g.fillStyle = 'rgba(122,63,176,.14)'; g.fill();
+    g.setLineDash([]); g.lineJoin = 'round'; g.lineWidth = (croqui ? 4 : 3) * K; g.strokeStyle = COR_ESTRUTURA; g.stroke();
+    const [cla, cln] = centroDe(es.pontos);
+    const [x, y] = P(cla, cln);
+    rotulosEst.push({ x, y, txt: croqui ? `${nomeEstrutura(es)} · ${formatarArea(areaM2(es.pontos))}` : nomeEstrutura(es) });
+  });
+
   // rede
   const rotulos = [];
   redes.forEach((r, ri) => {
@@ -160,6 +177,16 @@ export async function mapaEstatico({ area, pontos, redes }, W = 1600, H = 1000, 
       if (pc.preench) { g.globalAlpha = pc.opacidade ?? 1; g.fillStyle = pc.preench; g.fill(); g.globalAlpha = 1; }
       if (pc.traco) { g.lineWidth = (pc.principal ? 2.4 : Math.max(1.2, pc.peso)) * (croqui ? 1.6 * K : 1); g.strokeStyle = pc.traco; g.stroke(); }
     });
+  });
+
+  // nomes das estruturas
+  rotulosEst.forEach((r) => {
+    g.font = `bold ${Math.round((croqui ? 22 : 16) * K)}px Arial`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    const tw = g.measureText(r.txt).width;
+    const h = (croqui ? 32 : 24) * K;
+    g.fillStyle = 'rgba(255,255,255,.93)'; g.strokeStyle = COR_ESTRUTURA; g.lineWidth = 2 * K;
+    g.beginPath(); g.rect(r.x - tw / 2 - 8 * K, r.y - h / 2, tw + 16 * K, h); g.fill(); g.stroke();
+    g.fillStyle = '#5b2a8c'; g.fillText(r.txt, r.x, r.y + 1);
   });
 
   // rótulos da rede por cima dos símbolos
@@ -237,22 +264,22 @@ function linhaRede(tipo, situacao) {
   return `<svg width="38" height="10"><line x1="1" y1="5" x2="37" y2="5" stroke="${CORES[situacao]}" stroke-width="4" ${tipo === 'primaria' ? 'stroke-dasharray="8 5"' : ''}/></svg>`;
 }
 
-export async function montarRelatorio({ tarefa, equipe, pontos, fotos, urls, redes }) {
+export async function montarRelatorio({ tarefa, equipe, pontos, fotos, urls, redes, estruturas = [] }) {
   const moto = equipe.find((m) => m.id === tarefa.motoqueiro_id);
   const lider = equipe.find((m) => m.id === tarefa.criado_por);
   const previa = tarefa.status !== 'concluido';
   const agora = new Date();
   const logo = await logoEmbutida();
-  const mapa = await mapaEstatico({ area: tarefa.area, pontos, redes });
-  const croqui = (pontos.length || redes.length)
+  const mapa = await mapaEstatico({ area: tarefa.area, pontos, redes, estruturas });
+  const croqui = (pontos.length || redes.length || estruturas.length)
     ? await (() => {
       // formato da imagem acompanha o desenho: deitado, quadrado ou em pé
-      const d = [...pontos.map((p) => [p.lat, p.lng]), ...redes.flatMap((r) => r.pontos || [])];
+      const d = [...pontos.map((p) => [p.lat, p.lng]), ...redes.flatMap((r) => r.pontos || []), ...estruturas.flatMap((e) => e.pontos || [])];
       const la = d.map((x) => x[0]); const ln = d.map((x) => x[1]);
       const larg = (Math.max(...ln) - Math.min(...ln)) * Math.cos((la[0] * Math.PI) / 180);
       const alt = Math.max(...la) - Math.min(...la);
       const H = larg > alt * 1.4 ? 1700 : (alt > larg * 1.4 ? 3200 : 2400);
-      return mapaEstatico({ area: tarefa.area, pontos, redes }, 2400, H, { croqui: true });
+      return mapaEstatico({ area: tarefa.area, pontos, redes, estruturas }, 2400, H, { croqui: true });
     })() : null;
   const semPlaqueta = pontos.filter((p) => !p.plaqueta).length;
   const fora = pontos.filter((p) => p.fora_da_area).length;
@@ -368,12 +395,13 @@ ${previa ? '<div class="marca-dagua">PRÉVIA</div>' : ''}
   }).join('')}
     ${pontos.length ? '' : `<span>${svgPontoPequeno({})} Ponto (em escala real)</span>`}
     <span><i class="num">1</i> Número do ponto</span>
+    ${estruturas.length ? `<span>${svgEstrutura(26, 14)} Estrutura (nome e área)</span>` : ''}
     ${Object.keys(TIPOS).map((t) => Object.keys(SITUACOES).map((sit) => `<span>${linhaRede(t, sit)} ${TIPOS[t]} ${SITUACOES[sit].toLowerCase()}</span>`).join('')).join('')}
   </div>
 
   ${croqui ? `<section class="pag-croqui">
     <h2>Croqui do levantamento</h2>
-    <p class="dica-croqui">Desenho ampliado só dos pontos e da rede, para servir de base no AutoCAD. T = trecho de rede, com a metragem.${croqui.ampliou ? ' Os símbolos foram ampliados para leitura; a posição e o rumo são os reais.' : ''}</p>
+    <p class="dica-croqui">Desenho ampliado só dos pontos, da rede e das estruturas, para servir de base no AutoCAD. T = trecho de rede, com a metragem.${croqui.ampliou ? ' Os símbolos foram ampliados para leitura; a posição e o rumo são os reais.' : ''}</p>
     <div class="mapa croqui"><img src="${croqui.url}" alt="Croqui do levantamento"></div>
   </section>` : ''}
 
@@ -391,6 +419,11 @@ ${previa ? '<div class="marca-dagua">PRÉVIA</div>' : ''}
     ${Object.entries(somas).map(([k, m]) => { const [t, sit] = k.split('|'); return `<tr><td colspan="5"><b>Total ${TIPOS[t].toLowerCase()} ${SITUACOES[sit].toLowerCase()}</b></td><td><b>${formatarMetros(m)}</b></td></tr>`; }).join('')}
     ${Object.keys(CABOS).filter((c) => redes.some((r) => r.cabo === c)).map((c) => `<tr><td colspan="5">Total rede ${CABOS[c]}</td><td>${formatarMetros(redes.filter((r) => r.cabo === c).reduce((t, r) => t + metragemRede(r), 0))}</td></tr>`).join('')}
   </tbody></table>` : '<p class="sem-fotos">Nenhuma rede desenhada.</p>'}
+
+  ${estruturas.length ? `<h2>Estruturas</h2>
+  <table><thead><tr><th>Nº</th><th>Nome</th><th>Cantos</th><th>Área</th><th>Perímetro</th><th>Centro (lat, long)</th><th>Observações</th></tr></thead><tbody>
+    ${estruturas.map((e, i) => { const c = centroDe(e.pontos || []); return `<tr><td><b>${i + 1}</b></td><td>${esc(nomeEstrutura(e))}</td><td>${(e.pontos || []).length}</td><td>${formatarArea(areaM2(e.pontos))}</td><td>${formatarMetros(perimetroM(e.pontos))}</td><td>${c[0].toFixed(6)}, ${c[1].toFixed(6)}</td><td>${esc(e.observacoes || '—')}</td></tr>`; }).join('')}
+  </tbody></table>` : ''}
 
   <h2>Fichas dos pontos</h2>
   ${pontos.map((p, i) => {

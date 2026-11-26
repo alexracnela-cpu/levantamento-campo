@@ -11,8 +11,11 @@ import {
 import { abrirModal, confirmar, verOficio, guardarOficio, seloStatus } from './comum.js';
 import {
   salvarPonto, excluirPonto, adicionarFoto, removerFotoLocal, aoMudarFila, estadoFila, salvarRede, excluirRede,
-  finalizarTarefa,
+  finalizarTarefa, salvarEstrutura, excluirEstrutura,
 } from './sync.js';
+import {
+  EstruturaNoMapa, SUGESTOES_ESTRUTURA, nomeEstrutura, formatarArea, svgEstrutura,
+} from './estrutura.js';
 import {
   RedeNoMapa, TIPOS, SITUACOES, CABOS, CORES, svgLinha, formatarMetros, metragemRede, medidaInformada,
 } from './rede.js';
@@ -185,6 +188,7 @@ export async function telaCampo(el, { id }, ctx) {
       <button class="btn redondo grande" id="b-area" aria-label="Ver área">▢</button>
       <button class="btn" id="b-terminei">✓ Terminei</button>
       <button class="btn" id="b-rede">〰 Desenhar rede</button>
+      <button class="btn" id="b-estrutura">⬠ Estrutura</button>
       <button class="btn primario" id="b-aqui">+ Ponto onde estou</button>
     </div>
     <div class="campo-esq">
@@ -308,7 +312,8 @@ export async function telaCampo(el, { id }, ctx) {
   const numeroDo = (pid) => [...simbolos.keys()].indexOf(pid) + 1;
   const atualizarResumo = () => {
     const metros = [...redes.values()].reduce((t, r) => t + metragemRede(r.rede), 0);
-    $('#campo-contagem', el).textContent = `${simbolos.size} ponto(s)${redes.size ? ` · ${formatarMetros(metros)} de rede` : ''}`;
+    const nEst = estruturas.size;
+    $('#campo-contagem', el).textContent = `${simbolos.size} ponto(s)${redes.size ? ` · ${formatarMetros(metros)} de rede` : ''}${nEst ? ` · ${nEst} estrutura(s)` : ''}`;
   };
 
   const pontosBons = new Map(); // rede id -> pontos aceitos (para desfazer arrasto longe demais)
@@ -318,6 +323,7 @@ export async function telaCampo(el, { id }, ctx) {
       editavel: !travada,
       aoTocar: (alvo, ll) => {
         if (travada) { aviso(`Rede: ${formatarMetros(metragemRede(alvo.rede))}. Demanda entregue: só consulta.`); return; }
+        if (desenhandoEst) { adicionarVerticeEst([ll.lat, ll.lng]); return; }
         if (desenhando) { adicionarVertice([ll.lat, ll.lng]); return; }
         selecionarRede(alvo);
       },
@@ -349,6 +355,49 @@ export async function telaCampo(el, { id }, ctx) {
   };
   (await carregarRedes()).forEach(criarRede);
 
+  // ---- estruturas: polígono com nome livre (prédio, quadra, campo…); servidor + fila do celular
+  const estruturas = new Map();
+  let estSel = null;
+  let desenhandoEst = false;
+  let estAntes = [];
+  const estBons = new Map(); // estrutura id -> cantos aceitos (para desfazer arrasto longe demais)
+  const carregarEstruturas = async () => {
+    let lista = (await local.cacheLer(`estruturas:${id}`)) || [];
+    if (navigator.onLine) {
+      try {
+        const srv = await api.estruturas(id);
+        const fila = await local.todos('fila');
+        const pend = new Map(fila.filter((f) => f.dados.tarefa_id === id && (f.tipo === 'estrutura' || f.tipo === 'excluir_estrutura')).map((f) => [f.id, f]));
+        lista = srv.filter((r) => pend.get(r.id)?.tipo !== 'excluir_estrutura')
+          .map((r) => (pend.get(r.id)?.tipo === 'estrutura' ? { ...r, ...pend.get(r.id).dados } : r));
+        pend.forEach((f, rid) => { if (f.tipo === 'estrutura' && !lista.some((r) => r.id === rid)) lista.push(f.dados); });
+        await local.cacheGravar(`estruturas:${id}`, lista);
+      } catch { /* segue com a cópia local */ }
+    }
+    return lista;
+  };
+  const criarEstrutura = (e) => {
+    const es = new EstruturaNoMapa(mapa, e, {
+      editavel: !travada,
+      aoTocar: (alvo) => {
+        if (travada) { aviso(`${nomeEstrutura(alvo.est)} · ${formatarArea(alvo.area)}. Demanda entregue: só consulta.`); return; }
+        if (desenhando || desenhandoEst) return;
+        selecionarEstrutura(alvo);
+      },
+      aoMudar: (alvo, i) => {
+        const p = alvo.est.pontos[i];
+        if (p && !pertoDeMim(p[0], p[1])) { alvo.atualizar({ pontos: estBons.get(alvo.est.id) || [] }); return; }
+        estBons.set(alvo.est.id, alvo.est.pontos.map((x) => [...x]));
+        if (alvo.est.pontos.length >= 3) salvarEstrutura(alvo.est);
+        if (estSel === alvo) renderFicha();
+      },
+    });
+    estruturas.set(e.id, es);
+    estBons.set(e.id, es.est.pontos.map((x) => [...x]));
+    return es;
+  };
+  (await carregarEstruturas()).forEach(criarEstrutura);
+
   // consulta de um ponto de demanda entregue (sem editar)
   const verPontoTravado = (simb) => {
     const p = simb.ponto;
@@ -368,6 +417,7 @@ export async function telaCampo(el, { id }, ctx) {
       editavel: !travada,
       aoTocar: (simb) => {
         if (travada) { verPontoTravado(simb); return; }
+        if (desenhandoEst) { adicionarVerticeEst(simb.latlng); return; } // canto no centro do poste
         if (desenhando) { adicionarVertice(simb.latlng); return; } // encaixa a rede no centro do poste
         selecionar(simb);
       },
@@ -526,7 +576,74 @@ export async function telaCampo(el, { id }, ctx) {
     }
   };
 
+  const renderFichaEstrutura = () => {
+    const es = estSel;
+    const e = es.est;
+    const n = e.pontos.length;
+    ficha.hidden = false;
+    const dica = desenhandoEst
+      ? (n < 3 ? `Toque nos cantos da estrutura no mapa (faltam ${3 - n}). Tocar num poste usa o centro dele.` : 'Continue tocando nos cantos ou toque em Concluir.')
+      : 'Arraste os quadradinhos para ajustar os cantos.';
+    ficha.innerHTML = `
+      <div class="ficha-alca"></div>
+      <div class="ficha-topo">
+        <div class="ficha-titulo">${svgEstrutura(30, 18)}<b>${desenhandoEst ? 'Nova estrutura' : 'Estrutura'}</b></div>
+        <span class="medida-est" id="e-medida">${n >= 3 ? formatarArea(es.area) : `${n}/3 cantos`}</span>
+        <button class="btn primario" id="e-pronto">${desenhandoEst ? 'Concluir' : 'Pronto'}</button>
+      </div>
+      <p class="ficha-dica">${dica}</p>
+      ${desenhandoEst && n < 3 ? '' : `<label class="ficha-obs">Nome da estrutura
+        <input id="e-nome" maxlength="80" autocomplete="off" placeholder="Ex.: Prédio da escola, Quadra 12, Campo do bairro" value="${esc(e.nome || '')}"></label>
+      <div class="cabos sugestoes-est" role="group" aria-label="Sugestões de nome">
+        ${SUGESTOES_ESTRUTURA.map((t) => `<button type="button" data-sug="${esc(t)}" aria-pressed="${e.nome === t}">${esc(t)}</button>`).join('')}
+      </div>`}
+      ${desenhandoEst ? '' : `<label class="ficha-obs">Observações
+        <textarea id="e-obs" rows="2" placeholder="Ex.: 4 andares, iluminação só na frente">${esc(e.observacoes || '')}</textarea></label>`}
+      <div class="linha-botoes">
+        ${desenhandoEst
+    ? `<button class="btn" id="e-desfazer" ${n ? '' : 'disabled'}>↶ Desfazer</button><button class="btn" id="e-cancelar">Cancelar</button>`
+    : '<button class="btn" id="e-continuar">+ Mais cantos</button><button class="btn perigo" id="e-excluir">Excluir estrutura</button>'}
+      </div>`;
+    const salvarSeValida = () => { if (es.est.pontos.length >= 3) salvarEstrutura(es.est); atualizarResumo(); };
+    let tNome;
+    const campoNome = $('#e-nome', ficha) || { value: e.nome || '' };
+    campoNome.oninput = () => {
+      es.atualizar({ nome: campoNome.value });
+      $$('[data-sug]', ficha).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.sug === campoNome.value)));
+      clearTimeout(tNome);
+      tNome = setTimeout(salvarSeValida, 800);
+    };
+    campoNome.onblur = () => { clearTimeout(tNome); salvarSeValida(); };
+    campoNome.onkeydown = (ev) => { if (ev.key === 'Enter') campoNome.blur(); };
+    $$('[data-sug]', ficha).forEach((b) => {
+      b.onpointerdown = (ev) => ev.preventDefault();
+      b.onclick = () => { campoNome.value = b.dataset.sug; campoNome.oninput(); salvarSeValida(); };
+    });
+    let tObs;
+    const campoObs = $('#e-obs', ficha);
+    if (campoObs) {
+      campoObs.oninput = (ev) => { es.est.observacoes = ev.target.value; clearTimeout(tObs); tObs = setTimeout(salvarSeValida, 800); };
+      campoObs.onblur = () => { clearTimeout(tObs); salvarSeValida(); };
+    }
+    $('#e-pronto', ficha).onclick = () => (desenhandoEst ? concluirEstrutura() : fecharEstrutura());
+    if (desenhandoEst) {
+      $('#e-desfazer', ficha).onclick = () => { es.desfazer(); estBons.set(e.id, es.est.pontos.map((x) => [...x])); salvarSeValida(); renderFicha(); };
+      $('#e-cancelar', ficha).onclick = () => {
+        desenhandoEst = false;
+        if (estAntes.length >= 3) { es.atualizar({ pontos: estAntes }); salvarEstrutura(es.est); selecionarEstrutura(null); } else apagarEstrutura(es);
+        atualizarResumo();
+      };
+    } else {
+      $('#e-continuar', ficha).onclick = () => { estAntes = es.est.pontos.map((x) => [...x]); desenhandoEst = true; selecionarEstrutura(es); };
+      $('#e-excluir', ficha).onclick = async () => {
+        if (!await confirmar(`Excluir a estrutura "${nomeEstrutura(es.est)}"?`, 'Excluir')) return;
+        apagarEstrutura(es);
+      };
+    }
+  };
+
   const renderFicha = () => {
+    if (estSel) { renderFichaEstrutura(); return; }
     if (redeSel) { renderFichaRede(); return; }
     if (!selecionado) { ficha.hidden = true; return; }
     const p = selecionado.ponto;
@@ -691,6 +808,91 @@ export async function telaCampo(el, { id }, ctx) {
     renderFotos();
   };
 
+  function apagarEstrutura(es) {
+    excluirEstrutura(es.est);
+    es.remover();
+    estruturas.delete(es.est.id);
+    estSel = null;
+    desenhandoEst = false;
+    mapa.getContainer().classList.remove('desenhando');
+    el.querySelector('.tela-campo').classList.toggle('com-ficha', !!(selecionado || redeSel));
+    renderFicha();
+    atualizarResumo();
+  }
+
+  function selecionarEstrutura(es) {
+    if (estSel && estSel !== es) {
+      const antiga = estSel;
+      if (antiga.est.pontos.length < 3) { estSel = null; apagarEstrutura(antiga); } else { salvarEstrutura(antiga.est); antiga.selecionar(false); }
+    }
+    if (es && selecionado) { selecionado.selecionar(false); salvarPonto(selecionado.ponto); selecionado = null; }
+    if (es && redeSel) { redeSel.selecionar(false); redeSel = null; desenhando = false; }
+    estSel = es;
+    if (es) es.selecionar(true); else desenhandoEst = false;
+    if (es && !desenhandoEst && es.est.pontos.length) {
+      const ll = L.latLng(es.centro());
+      const y = mapa.latLngToContainerPoint(ll).y;
+      const alvo = mapa.getSize().y * 0.25;
+      if (Math.abs(y - alvo) > 20) mapa.panBy([0, y - alvo], { animate: true });
+    }
+    mapa.getContainer().classList.toggle('desenhando', (desenhandoEst && !!es) || (desenhando && !!redeSel));
+    el.querySelector('.tela-campo').classList.toggle('com-ficha', !!(es || redeSel || selecionado));
+    renderFicha();
+  }
+
+  function fecharEstrutura() {
+    if (estSel && !String(estSel.est.nome || '').trim()) {
+      aviso('Dê um nome para a estrutura (ex.: Prédio, Quadra, Campo).', 'erro');
+      $('#e-nome', ficha)?.focus();
+      return false;
+    }
+    selecionarEstrutura(null);
+    return true;
+  }
+
+  function adicionarVerticeEst(ll) {
+    if (!estSel) return;
+    if (!pertoDeMim(ll[0], ll[1])) return;
+    estSel.adicionarVertice(ll);
+    estBons.set(estSel.est.id, estSel.est.pontos.map((x) => [...x]));
+    if (estSel.est.pontos.length >= 3) salvarEstrutura(estSel.est);
+    atualizarResumo();
+    renderFicha();
+  }
+
+  function iniciarEstrutura() {
+    if (redeSel) { if (desenhando) concluirRede(); else selecionarRede(null); }
+    selecionar(null);
+    estAntes = [];
+    desenhandoEst = true;
+    selecionarEstrutura(criarEstrutura({ id: novoId(), tarefa_id: id, nome: '', pontos: [], observacoes: '' }));
+    if (gps.ultima) {
+      // deixa a posição do GPS na parte de cima, acima da ficha
+      seguir = false;
+      mapa.setView(gps.ultima.latlng, Math.max(mapa.getZoom(), 19), { animate: false });
+      mapa.panBy([0, mapa.getSize().y * 0.22], { animate: false });
+    }
+  }
+
+  function concluirEstrutura() {
+    const es = estSel;
+    if (es.est.pontos.length < 3) {
+      aviso('A estrutura precisa de pelo menos 3 cantos. Desenho descartado.');
+      apagarEstrutura(es);
+      return;
+    }
+    if (!String(es.est.nome || '').trim()) {
+      aviso('Dê um nome para a estrutura (ex.: Prédio, Quadra, Campo).', 'erro');
+      $('#e-nome', ficha)?.focus();
+      return;
+    }
+    desenhandoEst = false;
+    salvarEstrutura(es.est);
+    aviso(`Estrutura salva: ${nomeEstrutura(es.est)} · ${formatarArea(es.area)}.`, 'ok');
+    selecionarEstrutura(null);
+    atualizarResumo();
+  }
+
   function apagarRede(rd) {
     excluirRede(rd.rede);
     rd.remover();
@@ -704,6 +906,7 @@ export async function telaCampo(el, { id }, ctx) {
   }
 
   function selecionarRede(rd) {
+    if (rd && estSel) selecionarEstrutura(null);
     if (redeSel && redeSel !== rd) redeSel.selecionar(false);
     if (rd && selecionado) { selecionado.selecionar(false); salvarPonto(selecionado.ponto); selecionado = null; }
     redeSel = rd;
@@ -763,6 +966,7 @@ export async function telaCampo(el, { id }, ctx) {
   }
 
   function selecionar(s) {
+    if (s && estSel) selecionarEstrutura(null);
     if (s && redeSel) { redeSel.selecionar(false); redeSel = null; desenhando = false; }
     if (selecionado && selecionado !== s) {
       selecionado.selecionar(false);
@@ -806,6 +1010,8 @@ export async function telaCampo(el, { id }, ctx) {
 
   mapa.on('click', (e) => {
     if (travada) { aviso('Demanda entregue: não dá para alterar. Para mudar algo, peça ao líder para devolver.'); return; }
+    if (desenhandoEst) { adicionarVerticeEst([e.latlng.lat, e.latlng.lng]); return; }
+    if (estSel) { fecharEstrutura(); return; }
     if (desenhando) { adicionarVertice([e.latlng.lat, e.latlng.lng]); return; }
     if (redeSel) { selecionarRede(null); return; }
     if (selecionado) { selecionar(null); return; }
@@ -813,6 +1019,7 @@ export async function telaCampo(el, { id }, ctx) {
     novoPonto(e.latlng.lat, e.latlng.lng);
   });
   $('#b-rede', el).onclick = () => iniciarRede();
+  $('#b-estrutura', el).onclick = () => iniciarEstrutura();
   $('#b-terminei', el).onclick = () => {
     const metros = [...redes.values()].reduce((t, r) => t + metragemRede(r.rede), 0);
     const semPlaqueta = [...simbolos.values()].filter((s) => !s.ponto.plaqueta).length;
@@ -830,6 +1037,7 @@ export async function telaCampo(el, { id }, ctx) {
       fechar();
       if (selecionado) selecionar(null);
       if (redeSel) selecionarRede(null);
+      if (estSel) selecionarEstrutura(null);
       await finalizarTarefa(id, obs);
       tarefa.finalizada_em = new Date().toISOString();
       tarefa.finalizacao_obs = obs;
@@ -866,6 +1074,7 @@ export async function telaCampo(el, { id }, ctx) {
   return () => {
     if (selecionado) salvarPonto(selecionado.ponto);
     if (redeSel && redeSel.rede.pontos.length >= 2) salvarRede(redeSel.rede);
+    if (estSel && estSel.est.pontos.length >= 3) salvarEstrutura(estSel.est);
     pararFila();
     gps.parar();
     urlsLocais.forEach((u) => URL.revokeObjectURL(u));

@@ -4,6 +4,7 @@
 
 import { api } from './api.js';
 import { montarRelatorio } from './relatorio.js';
+import { nomeEstrutura, areaM2, perimetroM } from './estrutura.js';
 import { tipoPoste, nomePoste, equipamento, EQUIPAMENTOS, nomeSituacao } from './simbolo.js';
 import { comprimentoM, medidaInformada, TIPOS, SITUACOES, nomeCabo } from './rede.js';
 import { abrirModal, confirmar, seloStatus } from './comum.js';
@@ -64,8 +65,9 @@ async function emParalelo(itens, n, fn) {
 // ------------------------------------------------------------------
 async function adicionarDemanda(zip, tarefa, equipe, progresso) {
   const pasta = nomePasta(tarefa);
-  const [pontos, fotos, redes, arquivos] = await Promise.all([
+  const [pontos, fotos, redes, arquivos, estruturas] = await Promise.all([
     api.pontos(tarefa.id), api.fotos(tarefa.id), api.redes(tarefa.id).catch(() => []), api.arquivosDaTarefa(tarefa.id),
+    api.estruturas(tarefa.id).catch(() => []),
   ]);
 
   // nome de cada foto no pacote: ponto-03_plaqueta-1234_foto-1.jpg
@@ -100,7 +102,7 @@ async function adicionarDemanda(zip, tarefa, equipe, progresso) {
   if (falhas.length) throw new Error(`${falhas.length} arquivo(s) não baixaram (${falhas[0]}). Nada foi apagado.`);
 
   progresso(`${tarefa.titulo}: montando o relatório…`);
-  let html = await montarRelatorio({ tarefa, equipe, pontos, fotos, urls, redes });
+  let html = await montarRelatorio({ tarefa, equipe, pontos, fotos, urls, redes, estruturas });
   html = html.replace("location.hash.includes('sem-imprimir')", 'true'); // não abre a impressão sozinho
   await zip.adicionar(`${pasta}/relatorio.html`, html);
 
@@ -118,8 +120,15 @@ async function adicionarDemanda(zip, tarefa, equipe, progresso) {
         num(comprimentoM(r.pontos), 1), num(medidaInformada(r), 1), r.observacoes]),
     ]));
   }
+  if (estruturas.length) {
+    await zip.adicionar(`${pasta}/estruturas.csv`, csv([
+      ['Nº', 'Nome', 'Cantos', 'Área (m²)', 'Perímetro (m)', 'Cantos (lat lng; …)', 'Observações'],
+      ...estruturas.map((e, i) => [i + 1, nomeEstrutura(e), (e.pontos || []).length, num(areaM2(e.pontos), 1), num(perimetroM(e.pontos), 1),
+        (e.pontos || []).map(([la, ln]) => `${la.toFixed(7)} ${ln.toFixed(7)}`).join('; '), e.observacoes]),
+    ]));
+  }
   await zip.adicionar(`${pasta}/dados.json`, JSON.stringify({
-    gerado_em: new Date().toISOString(), tarefa, pontos, redes, fotos,
+    gerado_em: new Date().toISOString(), tarefa, pontos, redes, estruturas, fotos,
     fotos_no_pacote: Object.fromEntries(Object.entries(urls)),
   }, null, 2));
   return { arquivos: arquivos.length, bytes: arquivos.reduce((t, a) => t + Number(a.bytes || 0), 0) };
@@ -138,6 +147,7 @@ export async function baixarPacote(tarefas, equipe, progresso = () => {}) {
     '  relatorio.html  abre no navegador (com fotos e mapa); dá para imprimir ou salvar em PDF',
     '  pontos.csv      planilha dos pontos (abre no Excel)',
     '  rede.csv        planilha da rede desenhada (quando houver)',
+    '  estruturas.csv  estruturas desenhadas (prédio, quadra, campo…) com área e cantos (quando houver)',
     '  fotos/          fotos de cada ponto (o número é o mesmo do relatório)',
     '  oficio/         ofício ou encaminhamento anexado',
     '  dados.json      todos os dados, para guardar ou importar depois',

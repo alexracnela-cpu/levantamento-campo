@@ -672,6 +672,20 @@ label.check input, .tabela-uso input[type=checkbox] { width: 18px; height: 18px;
 .ct-end { margin: 2px 0 4px; font-size: .92rem; }
 .tema-escuro .tabela-demandas small.td-end, .tema-escuro .ct-end { color: #8cc4f2; }
 /* demanda entregue: campo só para consulta */
-.tela-campo.travada #b-terminei, .tela-campo.travada #b-rede, .tela-campo.travada #b-aqui, .tela-campo.travada #b-proximo { display: none; }
+.tela-campo.travada #b-terminei, .tela-campo.travada #b-rede, .tela-campo.travada #b-estrutura, .tela-campo.travada #b-aqui, .tela-campo.travada #b-proximo { display: none; }
 .campo-travada { position: absolute; left: 10px; right: 10px; bottom: 84px; z-index: 600; background: var(--cartao); color: var(--tinta); border: 1.5px solid var(--tinta-2); border-radius: 12px; padding: 10px 14px; font-weight: 600; box-shadow: var(--sombra); text-align: center; }
 .tema-escuro .campo-travada { color: inherit; }
+
+/* Estrutura (polígono com nome) */
+.rotulo-estrutura { background: none; border: 0; }
+.rotulo-estrutura span { display: inline-block; transform: translate(-50%, -50%); white-space: nowrap; padding: 2px 8px; border-radius: 10px; background: rgba(255,255,255,.92); color: #5b2a8c; border: 1.5px solid #7a3fb0; font: 700 .78rem var(--corpo); box-shadow: 0 1px 3px rgba(0,0,0,.25); cursor: pointer; }
+.rotulo-estrutura.ativo span { background: #7a3fb0; color: #fff; }
+.vertice-estrutura { border-color: #7a3fb0 !important; }
+.medida-est { margin-left: auto; margin-right: 8px; font-weight: 700; color: #7a3fb0; white-space: nowrap; }
+.sugestoes-est { margin: 4px 0 8px; }
+.tema-escuro .rotulo-estrutura span { background: rgba(20,14,34,.92); color: #d9b8ff; border-color: #b58aff; }
+.tema-escuro .rotulo-estrutura.ativo span { background: #7a3fb0; color: #fff; }
+.tema-escuro .medida-est { color: #d9b8ff; }
+.item-est { cursor: pointer; }
+.item-est small { color: var(--suave); }
+.sugestoes-est button { flex: 0 0 auto; min-height: 36px; padding: 4px 14px; border-radius: 18px; }
